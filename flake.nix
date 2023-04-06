@@ -34,6 +34,8 @@
           src = craneLib.cleanCargoSource ./.;
 
           buildInputs = with pkgs; [
+            openssl
+            pkg-config
           ];
 
           nativeBuildInputs = with pkgs; [
