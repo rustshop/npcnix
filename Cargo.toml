@@ -12,9 +12,9 @@ strip = "debuginfo"
 
 [dependencies]
 anyhow = "1.0.70"
-aws-config = { version = "0.55.0", default-features = false, features = ["native-tls"] }
-aws-sdk-s3 = "0.25.1"
 clap = { version = "4.2.1", features = ["derive", "env"] }
-tokio = { version = "1.27.0", features = ["macros", "net", "rt", "rt-multi-thread"] }
+tar = "0.4.38"
 tracing = "0.1.37"
+ureq = { version = "2.6.2", features = ["rustls-native-certs"] }
 url = "2.3.1"
+zstd = "0.12.3"
