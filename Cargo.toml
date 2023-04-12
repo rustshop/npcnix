@@ -9,12 +9,15 @@ edition = "2021"
 opt-level = "z"
 lto = true
 strip = "debuginfo"
+debug = 0
 
 [dependencies]
 anyhow = "1.0.70"
 clap = { version = "4.2.1", features = ["derive", "env"] }
+serde = { version = "1.0.160", features = ["derive"] }
+serde_json = "1.0.95"
 tar = "0.4.38"
 tracing = "0.1.37"
 ureq = { version = "2.6.2", features = ["rustls-native-certs"] }
-url = "2.3.1"
+url = { version = "2.3.1", features = ["serde"] }
 zstd = "0.12.3"
