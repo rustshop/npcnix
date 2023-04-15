@@ -1,14 +1,18 @@
+#![doc = include_str!("../README.md")]
+
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::Path;
 use std::process::{self, Stdio};
 
 use anyhow::bail;
+use data_dir::DataDir;
 use serde::Deserialize;
 use tracing::info;
 use url::Url;
 
 pub mod config;
+pub mod data_dir;
 pub mod misc;
 pub mod opts;
 
@@ -26,6 +30,7 @@ pub fn pull(remote: &Url, dst: &Path) -> anyhow::Result<()> {
 }
 
 pub fn push(src: &Path, remote: &url::Url) -> anyhow::Result<()> {
+    verify_flake_src(src)?;
     let scheme = remote.scheme();
     let (mut writer, mut child) = match scheme {
         "s3" => push_s3(remote)?,
@@ -50,6 +55,7 @@ pub fn get_etag(remote: &Url) -> anyhow::Result<String> {
 }
 
 pub fn activate(src: &Path, configuration: &str) -> Result<(), anyhow::Error> {
+    verify_flake_src(src)?;
     info!(
         configuration,
         src = %src.display(),
@@ -64,6 +70,32 @@ pub fn activate(src: &Path, configuration: &str) -> Result<(), anyhow::Error> {
         ])
         .current_dir(src)
         .status()?;
+    Ok(())
+}
+
+pub fn pack(src: &Path, dst: &Path) -> anyhow::Result<()> {
+    verify_flake_src(src)?;
+
+    let mut writer = io::BufWriter::new(
+        fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(dst)?,
+    );
+
+    pack_archive_from(src, &mut writer)?;
+    writer.flush()?;
+    drop(writer);
+    Ok(())
+}
+
+fn verify_flake_src(src: &Path) -> anyhow::Result<()> {
+    if !src.join("flake.nix").exists() {
+        anyhow::bail!(
+            "Flake source directory {} does not contain flake.nix file",
+            src.display()
+        );
+    }
     Ok(())
 }
 
@@ -141,4 +173,24 @@ fn pack_archive_from(src: &Path, writer: impl Write) -> io::Result<()> {
     builder.into_inner()?.finish()?;
 
     Ok(())
+}
+
+pub fn daemon(data_dir: &DataDir) -> anyhow::Result<()> {
+    loop {
+        // Note: we load every time, in case settings changed
+        let config = &data_dir.load_config()?;
+        config.rng_sleep();
+
+        let etag = self::get_etag(config.remote()?)?;
+
+        if config.last_etag() == etag {
+            info!("Remote not changed");
+            continue;
+        }
+
+        let tmp_dir = tempfile::TempDir::new()?;
+        self::pull(config.remote()?, tmp_dir.path())?;
+        self::activate(tmp_dir.path(), config.configuration())?;
+        data_dir.update_last_reconfiguration(&etag)?;
+    }
 }

@@ -4,7 +4,7 @@ set -eo pipefail
 
 # Revert `git stash` on exit
 function revert_git_stash {
-  >&2 echo "Unstashing uncommited changes..."
+  >&2 echo "Unstashing uncommitted changes..."
   git stash pop -q
 }
 
@@ -15,7 +15,7 @@ set -e
 
 # Stash pending changes and revert them when script ends
 if [ $is_unclean -ne 0 ]; then
-  >&2 echo "Stashing uncommited changes..."
+  >&2 echo "Stashing uncommitted changes..."
   git stash -q --keep-index
   trap revert_git_stash EXIT
 fi

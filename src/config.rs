@@ -48,6 +48,14 @@ impl Config {
         }
     }
 
+    pub fn with_updated_last_reconfiguration(self, etag: &str) -> Self {
+        Self {
+            last_etag: etag.to_owned(),
+            last_reconfiguration: chrono::Utc::now(),
+            ..self
+        }
+    }
+
     pub fn remote(&self) -> anyhow::Result<&Url> {
         self.remote
             .as_ref()

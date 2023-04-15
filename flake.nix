@@ -18,7 +18,6 @@
         pkgs = import nixpkgs {
           inherit system;
         };
-        lib = pkgs.lib;
         fenixChannel = fenix.packages.${system}.complete;
         fenixToolchain = (fenixChannel.withComponents [
           "rustc"
@@ -38,7 +37,7 @@
             pkg-config
           ];
 
-          nativeBuildInputs = with pkgs; [
+          nativeBuildInputs = [
           ];
         };
       in
@@ -48,11 +47,12 @@
         devShells = {
           default = pkgs.mkShell {
 
-            buildInputs = with pkgs; [ ] ++ commonArgs.buildInputs;
+            buildInputs = [ ] ++ commonArgs.buildInputs;
             nativeBuildInputs = with pkgs; [
               fenix.packages.${system}.rust-analyzer
               fenixToolchain
               cargo-udeps
+              typos
 
               # This is required to prevent a mangled bash shell in nix develop
               # see: https://discourse.nixos.org/t/interactive-bash-with-nix-develop-flake/15486
