@@ -1,8 +1,9 @@
 use std::io::Write as _;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process;
 
 use clap::{Parser, Subcommand};
+use tracing::info;
 use url::Url;
 
 #[derive(Parser, Debug, Clone)]
@@ -22,6 +23,7 @@ pub enum Command {
     Pull(PullOpts),
     Push(PushOpts),
     Activate(ActivateOpts),
+    Daemon,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -89,18 +91,31 @@ fn main() -> anyhow::Result<()> {
             let configuration = opts.common.get_current_configuration_with_opt_override(
                 activate_opts.configuration.as_deref(),
             )?;
-
-            process::Command::new("aws")
-                .args([
-                    "nixos-rebuild",
-                    "switch",
-                    "--flake",
-                    &format!(".{}", &configuration),
-                ])
-                .current_dir(&activate_opts.src)
-                .status()?;
+            npcnix_activate(&activate_opts.src, &configuration)?;
+        }
+        Command::Daemon => {
+            npcnix_daemon(&opts)?;
         }
     }
 
     Ok(())
+}
+
+fn npcnix_daemon(opts: &Opts) -> anyhow::Result<()> {
+    loop {
+        // Note: we load every time, in case settings changed
+        let config = &opts.common.load_config()?;
+        config.rng_sleep();
+
+        let current = npcnix::get_etag(config.remote()?)?;
+
+        if config.last_etag() == current {
+            info!("Remote not changed");
+            continue;
+        }
+
+        let tmp_dir = tempfile::TempDir::new()?;
+        npcnix::pull(config.remote()?, tmp_dir.path())?;
+        npcnix::activate(tmp_dir.path(), config.configuration())?;
+    }
 }

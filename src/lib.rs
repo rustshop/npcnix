@@ -3,6 +3,9 @@ use std::io::{self, Read, Write};
 use std::path::Path;
 use std::process::{self, Stdio};
 
+use anyhow::bail;
+use serde::Deserialize;
+use tracing::info;
 use url::Url;
 
 pub mod config;
@@ -38,7 +41,68 @@ pub fn push(src: &Path, remote: &url::Url) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub fn get_etag(remote: &Url) -> anyhow::Result<String> {
+    let scheme = remote.scheme();
+    Ok(match scheme {
+        "s3" => get_etag_s3(remote)?,
+        _ => anyhow::bail!("Protocol not supported: {scheme}"),
+    })
+}
+
+pub fn activate(src: &Path, configuration: &str) -> Result<(), anyhow::Error> {
+    info!(
+        configuration,
+        src = %src.display(),
+        "Activating configuration"
+    );
+    process::Command::new("aws")
+        .args([
+            "nixos-rebuild",
+            "switch",
+            "--flake",
+            &format!(".{configuration}"),
+        ])
+        .current_dir(src)
+        .status()?;
+    Ok(())
+}
+
+#[derive(Deserialize)]
+struct EtagResponse {
+    #[serde(rename = "ETag")]
+    etag: String,
+}
+
+fn get_etag_s3(remote: &Url) -> anyhow::Result<String> {
+    let output = process::Command::new("aws")
+        .args([
+            "s3api",
+            "get-object-attributes",
+            "--bucket",
+            remote
+                .host_str()
+                .ok_or_else(|| anyhow::format_err!("Invalid URL"))?,
+            "--key",
+            remote.path(),
+            "--object-attributes",
+            "ETag",
+        ])
+        .output()?;
+
+    if !output.status.success() {
+        bail!(
+            "s3api get-object-attributes returned code={:?}",
+            output.status.code()
+        )
+    }
+    let resp: EtagResponse = serde_json::from_slice(&output.stdout)?;
+
+    Ok(resp.etag)
+}
+
 fn pull_s3(remote: &Url) -> anyhow::Result<(impl Read, process::Child)> {
+    // by default this has 60s read & connect timeouts, so should not just
+    // hang, so no need for extra timeouts, I guess
     let mut child = process::Command::new("aws")
         .args(["s3", "cp", remote.as_str(), "-"])
         .stdout(Stdio::piped())
