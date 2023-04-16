@@ -4,7 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.05";
     flake-utils.url = "github:numtide/flake-utils";
-    crane.url = "github:ipetkov/crane";
+    crane.url = "github:ipetkov/crane?rev=445a3d222947632b5593112bb817850e8a9cf737"; # v0.12.1
     crane.inputs.nixpkgs.follows = "nixpkgs";
     fenix = {
       url = "github:nix-community/fenix";
@@ -18,6 +18,7 @@
         pkgs = import nixpkgs {
           inherit system;
         };
+        lib = pkgs.lib;
         fenixChannel = fenix.packages.${system}.complete;
         fenixToolchain = (fenixChannel.withComponents [
           "rustc"
@@ -29,20 +30,37 @@
         ]);
         craneLib = crane.lib.${system}.overrideToolchain fenixToolchain;
 
-        commonArgs = {
-          src = craneLib.cleanCargoSource ./.;
+        commonArgs =
 
-          buildInputs = with pkgs; [
-            openssl
-            pkg-config
-          ];
+          let
+            # Only keeps markdown files
+            readmeFilter = path: _type: builtins.match ".*/README\.md$" path != null;
+            markdownOrCargo = path: type:
+              (readmeFilter path type) || (craneLib.filterCargoSources path type);
+          in
+          {
+            src = lib.cleanSourceWith {
+              src = craneLib.path ./.;
+              filter = markdownOrCargo;
+            };
 
-          nativeBuildInputs = [
-          ];
-        };
+            buildInputs = with pkgs; [
+              openssl
+              pkg-config
+            ];
+
+            nativeBuildInputs = [
+            ];
+          };
+        npcnixPkg = craneLib.buildPackage ({ } // commonArgs);
       in
       {
-        packages.default = craneLib.buildPackage ({ } // commonArgs);
+        packages =
+          {
+            default = npcnixPkg;
+            npcnix = npcnixPkg;
+          };
+
 
         devShells = {
           default = pkgs.mkShell {
