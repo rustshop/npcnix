@@ -15,6 +15,7 @@ debug = 0
 anyhow = "1.0.70"
 chrono = { version = "0.4.24", features = ["serde", "clock"] }
 clap = { version = "4.2.1", features = ["derive", "env"] }
+md-5 = "0.10.5"
 # log = { version = "0.4.17", features = ["kv_unstable"] }
 rand = "0.8.5"
 serde = { version = "1.0.160", features = ["derive"] }
