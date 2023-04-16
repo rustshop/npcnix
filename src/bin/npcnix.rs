@@ -1,4 +1,5 @@
 #![doc = include_str!("../../README.md")]
+use std::ffi::OsString;
 use std::io::Write as _;
 use std::path::PathBuf;
 
@@ -72,6 +73,11 @@ pub struct PushOpts {
     /// Source directory
     #[arg(long)]
     src: PathBuf,
+
+    /// Include this subdirectory (can be specified multiple times; default:
+    /// all)
+    #[arg(long)]
+    include: Vec<OsString>,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -83,6 +89,11 @@ pub struct PackOpts {
     /// Destination file
     #[arg(long)]
     dst: PathBuf,
+
+    /// Include this subdirectory (can be specified multiple times; default:
+    /// all)
+    #[arg(long)]
+    include: Vec<OsString>,
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -101,8 +112,16 @@ fn main() -> anyhow::Result<()> {
                 .get_current_remote_with_opt_override(pull_opts.remote.as_ref())?,
             &pull_opts.dst,
         )?,
-        Command::Push(ref push_opts) => npcnix::push(&push_opts.src, &push_opts.remote)?,
-        Command::Pack(ref pack_opts) => npcnix::pack(&pack_opts.src, &pack_opts.dst)?,
+        Command::Push(ref push_opts) => npcnix::push(
+            &push_opts.src,
+            &push_opts.clone().include.into_iter().collect(),
+            &push_opts.remote,
+        )?,
+        Command::Pack(ref pack_opts) => npcnix::pack(
+            &pack_opts.src,
+            &pack_opts.clone().include.into_iter().collect(),
+            &pack_opts.dst,
+        )?,
         Command::Set(ref set_opts) => match set_opts {
             SetOpts::Remote { url } => opts
                 .data_dir()

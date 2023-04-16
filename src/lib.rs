@@ -1,5 +1,7 @@
 #![doc = include_str!("../README.md")]
 
+use std::collections::HashSet;
+use std::ffi::OsString;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::Path;
@@ -29,7 +31,7 @@ pub fn pull(remote: &Url, dst: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn push(src: &Path, remote: &url::Url) -> anyhow::Result<()> {
+pub fn push(src: &Path, include: &HashSet<OsString>, remote: &url::Url) -> anyhow::Result<()> {
     verify_flake_src(src)?;
     let scheme = remote.scheme();
     let (mut writer, mut child) = match scheme {
@@ -37,7 +39,7 @@ pub fn push(src: &Path, remote: &url::Url) -> anyhow::Result<()> {
         _ => anyhow::bail!("Protocol not supported: {scheme}"),
     };
 
-    pack_archive_from(src, &mut writer)?;
+    pack_archive_from(src, include, &mut writer)?;
     writer.flush()?;
     drop(writer);
 
@@ -73,7 +75,7 @@ pub fn activate(src: &Path, configuration: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub fn pack(src: &Path, dst: &Path) -> anyhow::Result<()> {
+pub fn pack(src: &Path, include: &HashSet<OsString>, dst: &Path) -> anyhow::Result<()> {
     verify_flake_src(src)?;
 
     let mut writer = io::BufWriter::new(
@@ -83,7 +85,7 @@ pub fn pack(src: &Path, dst: &Path) -> anyhow::Result<()> {
             .open(dst)?,
     );
 
-    pack_archive_from(src, &mut writer)?;
+    pack_archive_from(src, include, &mut writer)?;
     writer.flush()?;
     drop(writer);
     Ok(())
@@ -166,10 +168,28 @@ fn unpack_archive_to(reader: impl Read, dst: &Path) -> io::Result<()> {
     Ok(())
 }
 
-fn pack_archive_from(src: &Path, writer: impl Write) -> io::Result<()> {
+fn pack_archive_from(
+    src: &Path,
+    include: &HashSet<OsString>,
+    writer: impl Write,
+) -> io::Result<()> {
     let encoder = zstd::stream::Encoder::new(writer, 0)?;
     let mut builder = tar::Builder::new(encoder);
-    builder.append_dir_all(".", src)?;
+    let paths = fs::read_dir(src)?;
+    for path in paths {
+        let entry = path?;
+        let path = entry.path();
+        let file_name = path
+            .file_name()
+            .expect("read_dir must return only items with valid file_name");
+        if path.is_dir() {
+            if include.is_empty() || include.contains(file_name) {
+                builder.append_dir_all(file_name, &path)?;
+            }
+        } else {
+            builder.append_path_with_name(&path, file_name)?;
+        }
+    }
     builder.into_inner()?.finish()?;
 
     Ok(())
