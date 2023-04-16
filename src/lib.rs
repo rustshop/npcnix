@@ -10,7 +10,7 @@ use std::process::{self, Stdio};
 use anyhow::bail;
 use data_dir::DataDir;
 use serde::Deserialize;
-use tracing::info;
+use tracing::{debug, info};
 use url::Url;
 
 pub mod config;
@@ -56,22 +56,47 @@ pub fn get_etag(remote: &Url) -> anyhow::Result<String> {
     })
 }
 
-pub fn activate(src: &Path, configuration: &str) -> Result<(), anyhow::Error> {
+#[derive(Debug, Clone)]
+pub struct ActivateOpts {
+    pub extra_substituters: Vec<String>,
+    pub extra_trusted_public_keys: Vec<String>,
+}
+
+pub fn activate(
+    src: &Path,
+    configuration: &str,
+    activate_opts: &ActivateOpts,
+) -> Result<(), anyhow::Error> {
     verify_flake_src(src)?;
     info!(
         configuration,
         src = %src.display(),
         "Activating configuration"
     );
-    process::Command::new("aws")
-        .args([
-            "nixos-rebuild",
-            "switch",
-            "--flake",
-            &format!(".{configuration}"),
-        ])
-        .current_dir(src)
-        .status()?;
+    let mut cmd = process::Command::new("nixos-rebuild");
+    cmd.args(["switch"]);
+
+    for subscriber in &activate_opts.extra_substituters {
+        cmd.args(["--option", "extra-substituters", subscriber]);
+    }
+    for key in &activate_opts.extra_trusted_public_keys {
+        cmd.args(["--option", "extra-trusted-public-keys", key]);
+    }
+
+    cmd.args(["--flake", &format!(".{configuration}")])
+        .current_dir(src);
+
+    debug!(
+        cmd = [cmd.get_program()]
+            .into_iter()
+            .chain(cmd.get_args())
+            .map(|s| s.to_string_lossy())
+            .collect::<Vec<_>>()
+            .join(" "),
+        "Switching configuration"
+    );
+
+    cmd.status()?;
     Ok(())
 }
 
@@ -195,7 +220,7 @@ fn pack_archive_from(
     Ok(())
 }
 
-pub fn daemon(data_dir: &DataDir) -> anyhow::Result<()> {
+pub fn follow(data_dir: &DataDir, activate_opts: &ActivateOpts) -> anyhow::Result<()> {
     loop {
         // Note: we load every time, in case settings changed
         let config = &data_dir.load_config()?;
@@ -210,7 +235,7 @@ pub fn daemon(data_dir: &DataDir) -> anyhow::Result<()> {
 
         let tmp_dir = tempfile::TempDir::new()?;
         self::pull(config.remote()?, tmp_dir.path())?;
-        self::activate(tmp_dir.path(), config.configuration())?;
+        self::activate(tmp_dir.path(), config.configuration(), activate_opts)?;
         data_dir.update_last_reconfiguration(&etag)?;
     }
 }

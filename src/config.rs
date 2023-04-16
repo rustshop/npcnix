@@ -41,10 +41,30 @@ impl Config {
         }
     }
 
+    /// Like [`Self::with_configuration`] but if `init` is `true` will not
+    /// overwrite the existing value
+    pub fn with_configuration_maybe_init(self, configuration: &str, init: bool) -> Self {
+        if !init || self.configuration.is_empty() {
+            self.with_configuration(configuration)
+        } else {
+            self
+        }
+    }
+
     pub fn with_remote(self, remote: &Url) -> Self {
         Self {
             remote: Some(remote.clone()),
             ..self
+        }
+    }
+
+    /// Like [`Self:with_remote`] but if `init` is `true` will not overwrite the
+    /// existing value
+    pub fn with_remote_maybe_init(self, remote: &Url, init: bool) -> Self {
+        if !init || self.remote.is_none() {
+            self.with_remote(remote)
+        } else {
+            self
         }
     }
 

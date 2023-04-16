@@ -39,7 +39,7 @@ pub enum Command {
     Activate(ActivateOpts),
     /// Run as a daemon periodically activating NixOS configuration from the
     /// remote
-    Daemon,
+    Follow(FollowOpts),
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -54,6 +54,15 @@ pub struct PullOpts {
 }
 
 #[derive(Parser, Debug, Clone)]
+pub struct ActivateCommonOpts {
+    #[arg(long)]
+    extra_substituters: Vec<String>,
+
+    #[arg(long)]
+    extra_trusted_public_keys: Vec<String>,
+}
+
+#[derive(Parser, Debug, Clone)]
 pub struct ActivateOpts {
     #[arg(long, default_value = ".")]
     /// Source directory
@@ -62,44 +71,72 @@ pub struct ActivateOpts {
     #[arg(long)]
     /// Configuration to apply
     configuration: Option<String>,
+
+    #[command(flatten)]
+    activate: ActivateCommonOpts,
+}
+
+impl From<ActivateCommonOpts> for npcnix::ActivateOpts {
+    fn from(value: ActivateCommonOpts) -> Self {
+        npcnix::ActivateOpts {
+            extra_substituters: value.extra_substituters,
+            extra_trusted_public_keys: value.extra_trusted_public_keys,
+        }
+    }
+}
+
+#[derive(Parser, Debug, Clone)]
+pub struct PackCommonOpts {
+    /// Source directory
+    #[arg(long)]
+    src: PathBuf,
+
+    /// Include this subdirectory (can be specified multiple times; default:
+    /// all)
+    #[arg(long)]
+    include: Vec<OsString>,
 }
 
 #[derive(Parser, Debug, Clone)]
 pub struct PushOpts {
+    #[command(flatten)]
+    pack: PackCommonOpts,
+
     /// To prevent accidental push, remote is required
     #[arg(long)]
     remote: Url,
-
-    /// Source directory
-    #[arg(long)]
-    src: PathBuf,
-
-    /// Include this subdirectory (can be specified multiple times; default:
-    /// all)
-    #[arg(long)]
-    include: Vec<OsString>,
 }
 
 #[derive(Parser, Debug, Clone)]
 pub struct PackOpts {
-    /// Source directory
-    #[arg(long)]
-    src: PathBuf,
+    #[command(flatten)]
+    pack: PackCommonOpts,
 
     /// Destination file
     #[arg(long)]
     dst: PathBuf,
-
-    /// Include this subdirectory (can be specified multiple times; default:
-    /// all)
-    #[arg(long)]
-    include: Vec<OsString>,
 }
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum SetOpts {
-    Remote { url: Url },
-    Configuration { configuration: String },
+    Remote {
+        /// Only update if not already set
+        #[arg(long)]
+        init: bool,
+        url: Url,
+    },
+    Configuration {
+        /// Only update if not already set
+        #[arg(long)]
+        init: bool,
+        configuration: String,
+    },
+}
+
+#[derive(Parser, Debug, Clone)]
+pub struct FollowOpts {
+    #[command(flatten)]
+    activate: ActivateCommonOpts,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -113,24 +150,30 @@ fn main() -> anyhow::Result<()> {
             &pull_opts.dst,
         )?,
         Command::Push(ref push_opts) => npcnix::push(
-            &push_opts.src,
-            &push_opts.clone().include.into_iter().collect(),
+            &push_opts.pack.src,
+            &push_opts.clone().pack.include.into_iter().collect(),
             &push_opts.remote,
         )?,
         Command::Pack(ref pack_opts) => npcnix::pack(
-            &pack_opts.src,
-            &pack_opts.clone().include.into_iter().collect(),
+            &pack_opts.pack.src,
+            &pack_opts.clone().pack.include.into_iter().collect(),
             &pack_opts.dst,
         )?,
         Command::Set(ref set_opts) => match set_opts {
-            SetOpts::Remote { url } => opts
-                .data_dir()
-                .store_config(&opts.data_dir().load_config()?.with_remote(url))?,
-            SetOpts::Configuration { configuration } => opts.data_dir().store_config(
+            SetOpts::Remote { url, init } => opts.data_dir().store_config(
                 &opts
                     .data_dir()
                     .load_config()?
-                    .with_configuration(configuration),
+                    .with_remote_maybe_init(url, *init),
+            )?,
+            SetOpts::Configuration {
+                configuration,
+                init,
+            } => opts.data_dir().store_config(
+                &opts
+                    .data_dir()
+                    .load_config()?
+                    .with_configuration_maybe_init(configuration, *init),
             )?,
         },
         Command::Show => {
@@ -142,10 +185,14 @@ fn main() -> anyhow::Result<()> {
                 .get_current_configuration_with_opt_override(
                     activate_opts.configuration.as_deref(),
                 )?;
-            npcnix::activate(&activate_opts.src, &configuration)?;
+            npcnix::activate(
+                &activate_opts.src,
+                &configuration,
+                &activate_opts.clone().activate.into(),
+            )?;
         }
-        Command::Daemon => {
-            npcnix::daemon(&opts.data_dir())?;
+        Command::Follow(ref follow_opts) => {
+            npcnix::follow(&opts.data_dir(), &follow_opts.clone().activate.into())?;
         }
     }
 
