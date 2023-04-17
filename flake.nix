@@ -57,6 +57,10 @@
               rust-analyzer
               cargo-udeps
               typos
+              cargo
+              rustc
+              rustfmt
+              clippy
 
               # This is required to prevent a mangled bash shell in nix develop
               # see: https://discourse.nixos.org/t/interactive-bash-with-nix-develop-flake/15486
