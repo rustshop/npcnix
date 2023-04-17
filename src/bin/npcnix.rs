@@ -138,6 +138,10 @@ pub enum SetOpts {
 pub struct FollowOpts {
     #[command(flatten)]
     activate: ActivateCommonOpts,
+
+    /// Stop after first success
+    #[arg(long)]
+    once: bool,
 }
 
 pub fn tracing_init() -> anyhow::Result<()> {
@@ -202,7 +206,11 @@ fn main() -> anyhow::Result<()> {
             )?;
         }
         Command::Follow(ref follow_opts) => {
-            npcnix::follow(&opts.data_dir(), &follow_opts.clone().activate.into())?;
+            npcnix::follow(
+                &opts.data_dir(),
+                &follow_opts.clone().activate.into(),
+                follow_opts.once,
+            )?;
         }
     }
 

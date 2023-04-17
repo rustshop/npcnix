@@ -105,10 +105,16 @@ pub fn activate(
         cmd.args(["--option", "extra-trusted-public-keys", key]);
     }
 
-    cmd.args(["--flake", &format!(".{configuration}")])
+    cmd.args(["--flake", &format!(".#{configuration}")])
         .current_dir(src);
 
-    cmd.log_debug().status()?;
+    let status = cmd.log_debug().status()?;
+    if !status.success() {
+        bail!(
+            "aws s3api get-object-attributes returned code={:?}",
+            status.code(),
+        )
+    }
     Ok(())
 }
 
@@ -266,7 +272,7 @@ fn pack_archive_from(
     Ok(())
 }
 
-pub fn follow(data_dir: &DataDir, activate_opts: &ActivateOpts) -> anyhow::Result<()> {
+pub fn follow(data_dir: &DataDir, activate_opts: &ActivateOpts, once: bool) -> anyhow::Result<()> {
     loop {
         // Note: we load every time, in case settings changed
         let config = &data_dir.load_config()?;
@@ -283,5 +289,10 @@ pub fn follow(data_dir: &DataDir, activate_opts: &ActivateOpts) -> anyhow::Resul
         self::pull(config.remote()?, tmp_dir.path())?;
         self::activate(tmp_dir.path(), config.configuration()?, activate_opts)?;
         data_dir.update_last_reconfiguration(&etag)?;
+
+        if once {
+            debug!("Exiting after successful activation with `once` option");
+            return Ok(())
+        }
     }
 }
