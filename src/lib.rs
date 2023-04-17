@@ -7,7 +7,7 @@ use std::io::{self, Read, Write};
 use std::path::Path;
 use std::process::{self, Stdio};
 
-use anyhow::{bail, Context};
+use anyhow::{bail, Context, format_err};
 use data_dir::DataDir;
 use serde::Deserialize;
 use tracing::{debug, info, trace, warn};
@@ -152,9 +152,10 @@ fn get_etag_s3(remote: &Url) -> anyhow::Result<String> {
             "--bucket",
             remote
                 .host_str()
-                .ok_or_else(|| anyhow::format_err!("Invalid URL"))?,
+                .ok_or_else(|| format_err!("Invalid URL"))?,
             "--key",
-            remote.path(),
+            remote.path().split_once('/')
+                .ok_or_else(|| format_err!("Path doesn't start with a /"))?.1,
             "--object-attributes",
             "ETag",
         ])
