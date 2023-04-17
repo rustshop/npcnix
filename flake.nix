@@ -26,6 +26,8 @@
               (readmeFilter path type) || (craneLib.filterCargoSources path type);
           in
           {
+            doCheck = false;
+
             src = lib.cleanSourceWith {
               src = craneLib.path ./.;
               filter = markdownOrCargo;
