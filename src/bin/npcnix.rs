@@ -29,17 +29,11 @@ impl Opts {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum Command {
-    /// Change daemon settings
-    Set {
-        /// Only update if not already set
-        #[arg(long)]
-        init: bool,
-
+    /// Configuration options
+    Config {
         #[command(subcommand)]
-        value: SetOpts,
+        command: Option<ConfigOpts>,
     },
-    /// Show daemon config
-    Show,
     /// Pack a Nix Flake in a directory into a file
     Pack(PackOpts),
     /// Pull a packed Nix Flake from a remote and extra to a directory
@@ -51,6 +45,20 @@ pub enum Command {
     /// Run as a daemon periodically activating NixOS configuration from the
     /// remote
     Follow(FollowOpts),
+}
+
+#[derive(Subcommand, Debug, Clone)]
+pub enum ConfigOpts {
+    Show,
+    /// Change daemon settings
+    Set {
+        /// Only update if not already set
+        #[arg(long)]
+        init: bool,
+
+        #[command(subcommand)]
+        value: SetOpts,
+    },
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -176,23 +184,25 @@ fn main() -> anyhow::Result<()> {
             &pack_opts.clone().pack.include.into_iter().collect(),
             &pack_opts.dst,
         )?,
-        Command::Set { init, ref value } => match value {
-            SetOpts::Remote { ref url } => opts.data_dir().store_config(
-                &opts
-                    .data_dir()
-                    .load_config()?
-                    .with_remote_maybe_init(url, init),
-            )?,
-            SetOpts::Configuration { configuration } => opts.data_dir().store_config(
-                &opts
-                    .data_dir()
-                    .load_config()?
-                    .with_configuration_maybe_init(configuration, init),
-            )?,
+        Command::Config { ref command } => match command {
+            Some(ConfigOpts::Show) | None => {
+                let _ = write!(std::io::stdout(), "{}", opts.data_dir().load_config()?);
+            }
+            Some(ConfigOpts::Set { init, ref value }) => match value {
+                SetOpts::Remote { ref url } => opts.data_dir().store_config(
+                    &opts
+                        .data_dir()
+                        .load_config()?
+                        .with_remote_maybe_init(url, *init),
+                )?,
+                SetOpts::Configuration { ref configuration } => opts.data_dir().store_config(
+                    &opts
+                        .data_dir()
+                        .load_config()?
+                        .with_configuration_maybe_init(configuration, *init),
+                )?,
+            },
         },
-        Command::Show => {
-            let _ = write!(std::io::stdout(), "{}", opts.data_dir().load_config()?);
-        }
         Command::Activate(ref activate_opts) => {
             let configuration = opts
                 .data_dir()
