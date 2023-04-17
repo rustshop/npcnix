@@ -7,10 +7,10 @@ use std::io::{self, Read, Write};
 use std::path::Path;
 use std::process::{self, Stdio};
 
-use anyhow::bail;
+use anyhow::{bail, Context};
 use data_dir::DataDir;
 use serde::Deserialize;
-use tracing::{debug, info};
+use tracing::{debug, info, trace, warn};
 use url::Url;
 
 pub mod config;
@@ -39,7 +39,7 @@ pub fn push(src: &Path, include: &HashSet<OsString>, remote: &url::Url) -> anyho
         _ => anyhow::bail!("Protocol not supported: {scheme}"),
     };
 
-    pack_archive_from(src, include, &mut writer)?;
+    pack_archive_from(src, include, &mut writer).context("Failed to pack the src archive")?;
     writer.flush()?;
     drop(writer);
 
@@ -110,7 +110,7 @@ pub fn pack(src: &Path, include: &HashSet<OsString>, dst: &Path) -> anyhow::Resu
             .open(dst)?,
     );
 
-    pack_archive_from(src, include, &mut writer)?;
+    pack_archive_from(src, include, &mut writer).context("Failed to pack the src archive")?;
     writer.flush()?;
     drop(writer);
     Ok(())
@@ -207,12 +207,40 @@ fn pack_archive_from(
         let file_name = path
             .file_name()
             .expect("read_dir must return only items with valid file_name");
-        if path.is_dir() {
+        let metadata = path.symlink_metadata()?;
+        trace!(
+            src = %path.display(),
+            "Considering path for archive inclusion"
+        );
+        if metadata.is_dir() {
             if include.is_empty() || include.contains(file_name) {
+                trace!(src = %path.display(), "Packing directory");
                 builder.append_dir_all(file_name, &path)?;
+            } else {
+                debug!(
+                    src = %path.display(),
+                    "Ignoring directory with no 'include'"
+                );
             }
-        } else {
+        } else if metadata.is_symlink() {
+            let path_target = path.read_link()?;
+            if !path_target.is_absolute() {
+                trace!(src = %path.display(),
+                    
+                    target = %path_target.display(),
+                     "Packing relative symlink");
+                builder.append_path_with_name(&path, file_name)?;
+            } else {
+                warn!(
+                    src = %path.display(),
+                    "Ignoring absolute symlink"
+                );
+            }
+        } else if metadata.is_file() {
+            trace!(src = %path.display(), "Packing file");
             builder.append_path_with_name(&path, file_name)?;
+        } else {
+            warn!(src = %path.display(), "Ignoring unknown file type");
         }
     }
     builder.into_inner()?.finish()?;
