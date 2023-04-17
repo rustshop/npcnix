@@ -41,13 +41,18 @@
             nativeBuildInputs = [
             ];
           };
-        npcnixPkg = craneLib.buildPackage ({ } // commonArgs);
+        npcnixPkgUnwrapped = craneLib.buildPackage ({ } // commonArgs);
+        npcnixPkgWrapped = pkgs.writeShellScriptBin "npcnix" ''
+          exec env NPCNIX_AWS_CLI=${pkgs.awscli2}/bin/aws \
+            ${npcnixPkgUnwrapped}/bin/npcnix "$@"
+        '';
       in
       {
         packages =
           {
-            default = npcnixPkg;
-            npcnix = npcnixPkg;
+            default = npcnixPkgWrapped;
+            npcnix-unwrapped = npcnixPkgUnwrapped;
+            npcnix = npcnixPkgWrapped;
             setup = pkgs.writeShellScriptBin "npcnix-setup" ''
               set -e
               if [ -z "$1" ]; then
@@ -58,9 +63,9 @@
                 >&2 echo "Missing configuration"
                 exit 1
               fi
-              ${npcnixPkg}/bin/npcnix set --init remote "$1"
-              ${npcnixPkg}/bin/npcnix set --init configuration "$2"
-              ${npcnixPkg}/bin/npcnix follow
+              ${npcnixPkgWrapped}/bin/npcnix set --init remote "$1"
+              ${npcnixPkgWrapped}/bin/npcnix set --init configuration "$2"
+              ${npcnixPkgWrapped}/bin/npcnix follow
             '';
           };
 
@@ -90,8 +95,9 @@
 
             ] ++ commonArgs.nativeBuildInputs;
             shellHook = ''
-              dot_git="$(git rev-parse --git-common-dir)"
-              if [[ ! -d "$dot_git/hooks" ]]; then mkdir "$dot_git/hooks"; fi
+              dot_git = "$(git rev-parse --git-common-dir)"
+                if [[ ! -d "$dot_git/hooks" ]];
+              then mkdir "$dot_git/hooks"; fi
               for hook in misc/git-hooks/* ; do ln -sf "$(pwd)/$hook" "$dot_git/hooks/" ; done
               ${pkgs.git}/bin/git config commit.template $(pwd)/misc/git-hooks/commit-template.txt
             '';
@@ -100,3 +106,4 @@
       }
     );
 }
+

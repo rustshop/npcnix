@@ -38,7 +38,7 @@ impl DataDir {
             .map(ToOwned::to_owned)
             .ok_or(())
             .or_else(|_| -> anyhow::Result<String> {
-                Ok(self.load_config()?.configuration().to_owned())
+                Ok(self.load_config()?.configuration()?.to_owned())
             })
     }
 

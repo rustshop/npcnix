@@ -6,9 +6,6 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 use url::Url;
 
-fn default_configuration() -> String {
-    "nixos".into()
-}
 fn default_max_sleep_secs() -> u64 {
     120
 }
@@ -17,8 +14,7 @@ fn default_max_sleep_secs() -> u64 {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     remote: Option<Url>,
-    #[serde(default = "default_configuration")]
-    configuration: String,
+    configuration: Option<String>,
     last_reconfiguration: chrono::DateTime<chrono::Utc>,
     last_etag: String,
     #[serde(default = "default_max_sleep_secs")]
@@ -29,7 +25,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             remote: None,
-            configuration: default_configuration(),
+            configuration: None,
             last_reconfiguration: chrono::Utc::now(),
             last_etag: "".into(),
             max_sleep_secs: default_max_sleep_secs(),
@@ -47,7 +43,7 @@ impl Config {
 
     pub fn with_configuration(self, configuration: &str) -> Self {
         Self {
-            configuration: configuration.into(),
+            configuration: Some(configuration.into()),
             ..self
         }
     }
@@ -55,7 +51,7 @@ impl Config {
     /// Like [`Self::with_configuration`] but if `init` is `true` will not
     /// overwrite the existing value
     pub fn with_configuration_maybe_init(self, configuration: &str, init: bool) -> Self {
-        if !init || self.configuration.is_empty() {
+        if !init || self.configuration.is_none() {
             self.with_configuration(configuration)
         } else {
             self
@@ -93,8 +89,10 @@ impl Config {
             .ok_or_else(|| format_err!("Remote not set"))
     }
 
-    pub fn configuration(&self) -> &str {
-        &self.configuration
+    pub fn configuration(&self) -> anyhow::Result<&str> {
+        self.configuration
+            .as_deref()
+            .ok_or_else(|| format_err!("configuration not set"))
     }
 
     pub fn cur_rng_sleep_time(&self) -> chrono::Duration {
@@ -110,7 +108,7 @@ impl Config {
             (since_last_update.num_seconds() as f32 / secs_in_a_day as f32).clamp(0.01f32, 1f32);
         assert!(0f32 < ratio);
 
-        let base_time = ratio * self.max_sleep_secs as f32;
+        let base_time = ratio * cmp::max(15, self.max_sleep_secs) as f32;
         let rnd_time = rand::thread_rng().gen_range(base_time * 0.5..=base_time * 1.5);
         assert!(0f32 < rnd_time);
 

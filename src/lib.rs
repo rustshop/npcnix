@@ -18,6 +18,9 @@ pub mod data_dir;
 pub mod misc;
 pub mod opts;
 
+pub fn aws_cli_path() -> OsString {
+    std::env::var_os("NPCNIX_AWS_CLI").unwrap_or_else(|| OsString::from("aws"))
+}
 pub fn pull(remote: &Url, dst: &Path) -> anyhow::Result<()> {
     let scheme = remote.scheme();
     let (reader, mut child) = match scheme {
@@ -133,7 +136,7 @@ struct EtagResponse {
 }
 
 fn get_etag_s3(remote: &Url) -> anyhow::Result<String> {
-    let output = process::Command::new("aws")
+    let output = process::Command::new(aws_cli_path())
         .args([
             "s3api",
             "get-object-attributes",
@@ -162,7 +165,7 @@ fn get_etag_s3(remote: &Url) -> anyhow::Result<String> {
 fn pull_s3(remote: &Url) -> anyhow::Result<(impl Read, process::Child)> {
     // by default this has 60s read & connect timeouts, so should not just
     // hang, so no need for extra timeouts, I guess
-    let mut child = process::Command::new("aws")
+    let mut child = process::Command::new(aws_cli_path())
         .args(["s3", "cp", remote.as_str(), "-"])
         .stdout(Stdio::piped())
         .spawn()?;
@@ -173,7 +176,7 @@ fn pull_s3(remote: &Url) -> anyhow::Result<(impl Read, process::Child)> {
 }
 
 fn push_s3(remote: &Url) -> anyhow::Result<(impl Write, process::Child)> {
-    let mut child = process::Command::new("aws")
+    let mut child = process::Command::new(aws_cli_path())
         .args(["s3", "cp", "-", remote.as_str()])
         .stdin(Stdio::piped())
         .spawn()?;
@@ -263,7 +266,7 @@ pub fn follow(data_dir: &DataDir, activate_opts: &ActivateOpts) -> anyhow::Resul
 
         let tmp_dir = tempfile::TempDir::new()?;
         self::pull(config.remote()?, tmp_dir.path())?;
-        self::activate(tmp_dir.path(), config.configuration(), activate_opts)?;
+        self::activate(tmp_dir.path(), config.configuration()?, activate_opts)?;
         data_dir.update_last_reconfiguration(&etag)?;
     }
 }
