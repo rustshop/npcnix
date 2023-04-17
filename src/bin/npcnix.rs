@@ -1,10 +1,15 @@
 #![doc = include_str!("../../README.md")]
-use std::ffi::OsString;
 use std::io::Write as _;
 use std::path::PathBuf;
+use std::{ffi::OsString, io};
 
 use clap::{Parser, Subcommand};
 use npcnix::data_dir::DataDir;
+use tracing::trace;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::EnvFilter;
+use tracing_subscriber::Layer;
 use url::Url;
 
 #[derive(Parser, Debug, Clone)]
@@ -135,7 +140,19 @@ pub struct FollowOpts {
     activate: ActivateCommonOpts,
 }
 
+pub fn tracing_init() -> anyhow::Result<()> {
+    let filter_layer = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let fmt_layer = tracing_subscriber::fmt::layer()
+        .with_writer(io::stderr)
+        .with_filter(filter_layer);
+
+    tracing_subscriber::registry().with(fmt_layer).init();
+    Ok(())
+}
+
 fn main() -> anyhow::Result<()> {
+    tracing_init()?;
+    trace!("Staring npcnix");
     let opts = Opts::parse();
 
     match opts.command {
