@@ -53,7 +53,7 @@
             default = npcnixPkgWrapped;
             npcnix-unwrapped = npcnixPkgUnwrapped;
             npcnix = npcnixPkgWrapped;
-            setup = pkgs.writeShellScriptBin "npcnix-setup" ''
+            install = pkgs.writeShellScriptBin "npcnix-install" ''
               set -e
               if [ -z "$1" ]; then
                 >&2 echo "Missing remote"

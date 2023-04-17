@@ -31,3 +31,6 @@ jobs:
 
       - name: Build npcnix
         run: nix build .#npcnix
+
+      - name: Build npcnix-install
+        run: nix build .#install
