@@ -96,14 +96,14 @@ impl Config {
 
         let secs_in_a_day = 24 * 60 * 60;
         let ratio =
-            (since_last_update.num_seconds() as f32 / secs_in_a_day as f32).clamp(0f32, 1f32);
-        assert!(0f32 <= ratio);
+            (since_last_update.num_seconds() as f32 / secs_in_a_day as f32).clamp(0.01f32, 1f32);
+        assert!(0f32 < ratio);
 
         let base_time = ratio * self.max_sleep_secs as f32;
         let rnd_time = rand::thread_rng().gen_range(base_time * 0.5..base_time * 1.5);
-        assert!(0f32 <= rnd_time);
+        assert!(0f32 < rnd_time);
 
-        chrono::Duration::seconds(rnd_time as i64)
+        chrono::Duration::seconds(cmp::max(10, rnd_time as i64))
     }
 
     pub fn rng_sleep(&self) {
