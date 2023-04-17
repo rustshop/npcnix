@@ -2,33 +2,20 @@
   description = "dpc's basic flake template";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.05";
+    nixpkgs.url = "github:NixOS/nixpkgs?rev=f294325aed382b66c7a188482101b0f336d1d7db"; # nixos-unstable
     flake-utils.url = "github:numtide/flake-utils";
     crane.url = "github:ipetkov/crane?rev=445a3d222947632b5593112bb817850e8a9cf737"; # v0.12.1
     crane.inputs.nixpkgs.follows = "nixpkgs";
-    fenix = {
-      url = "github:nix-community/fenix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
-  outputs = { self, nixpkgs, flake-utils, crane, fenix }:
+  outputs = { self, nixpkgs, flake-utils, crane }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
           inherit system;
         };
         lib = pkgs.lib;
-        fenixChannel = fenix.packages.${system}.complete;
-        fenixToolchain = (fenixChannel.withComponents [
-          "rustc"
-          "cargo"
-          "clippy"
-          "rust-analysis"
-          "rust-src"
-          "rustfmt"
-        ]);
-        craneLib = crane.lib.${system}.overrideToolchain fenixToolchain;
+        craneLib = crane.lib.${system};
 
         commonArgs =
 
@@ -67,8 +54,7 @@
 
             buildInputs = [ ] ++ commonArgs.buildInputs;
             nativeBuildInputs = with pkgs; [
-              fenix.packages.${system}.rust-analyzer
-              fenixToolchain
+              rust-analyzer
               cargo-udeps
               typos
 
