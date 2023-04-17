@@ -48,6 +48,20 @@
           {
             default = npcnixPkg;
             npcnix = npcnixPkg;
+            setup = pkgs.writeShellScriptBin "npcnix-setup" ''
+              set -e
+              if [ -z "$1" ]; then
+                >&2 echo "Missing remote"
+                exit 1
+              fi
+              if [ -z "$2" ]; then
+                >&2 echo "Missing configuration"
+                exit 1
+              fi
+              ${npcnixPkg}/bin/npcnix set --init remote "$1"
+              ${npcnixPkg}/bin/npcnix set --init configuration "$2"
+              ${npcnixPkg}/bin/npcnix follow
+            '';
           };
 
 
