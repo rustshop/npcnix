@@ -24,9 +24,15 @@ impl Opts {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum Command {
-    #[command(subcommand)]
     /// Change daemon settings
-    Set(SetOpts),
+    Set {
+        /// Only update if not already set
+        #[arg(long)]
+        init: bool,
+
+        #[command(subcommand)]
+        value: SetOpts,
+    },
     /// Show daemon config
     Show,
     /// Pack a Nix Flake in a directory into a file
@@ -119,18 +125,8 @@ pub struct PackOpts {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum SetOpts {
-    Remote {
-        /// Only update if not already set
-        #[arg(long)]
-        init: bool,
-        url: Url,
-    },
-    Configuration {
-        /// Only update if not already set
-        #[arg(long)]
-        init: bool,
-        configuration: String,
-    },
+    Remote { url: Url },
+    Configuration { configuration: String },
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -159,21 +155,18 @@ fn main() -> anyhow::Result<()> {
             &pack_opts.clone().pack.include.into_iter().collect(),
             &pack_opts.dst,
         )?,
-        Command::Set(ref set_opts) => match set_opts {
-            SetOpts::Remote { url, init } => opts.data_dir().store_config(
+        Command::Set { init, ref value } => match value {
+            SetOpts::Remote { ref url } => opts.data_dir().store_config(
                 &opts
                     .data_dir()
                     .load_config()?
-                    .with_remote_maybe_init(url, *init),
+                    .with_remote_maybe_init(url, init),
             )?,
-            SetOpts::Configuration {
-                configuration,
-                init,
-            } => opts.data_dir().store_config(
+            SetOpts::Configuration { configuration } => opts.data_dir().store_config(
                 &opts
                     .data_dir()
                     .load_config()?
-                    .with_configuration_maybe_init(configuration, *init),
+                    .with_configuration_maybe_init(configuration, init),
             )?,
         },
         Command::Show => {
