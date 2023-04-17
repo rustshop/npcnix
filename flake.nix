@@ -65,6 +65,16 @@
               fi
               ${npcnixPkgWrapped}/bin/npcnix set --init remote "$1"
               ${npcnixPkgWrapped}/bin/npcnix set --init configuration "$2"
+
+              npcnix_swapfile="/npcnix-swapfile"
+              if [ ! -e "$npcnix_swapfile" ]; then
+                ${pkgs.util-linux}/bin/fallocate -l 1G "$npcnix_swapfile" || true
+              fi
+              chmod 600 "$npcnix_swapfile" && \
+                ${pkgs.util-linux}/bin/mkswap "$npcnix_swapfile" && \
+                ${pkgs.util-linux}/bin/swapon "$npcnix_swapfile" && \
+                true
+
               ${npcnixPkgWrapped}/bin/npcnix follow
             '';
           };
