@@ -7,7 +7,7 @@ use std::io::{self, Read, Write};
 use std::path::Path;
 use std::process::{self, Stdio};
 
-use anyhow::{bail, Context, format_err};
+use anyhow::{bail, format_err, Context};
 use data_dir::DataDir;
 use serde::Deserialize;
 use tracing::{debug, info, trace, warn};
@@ -40,6 +40,11 @@ impl CommandExt for process::Command {
 pub fn aws_cli_path() -> OsString {
     std::env::var_os("NPCNIX_AWS_CLI").unwrap_or_else(|| OsString::from("aws"))
 }
+
+pub fn nixos_rebuild_path() -> OsString {
+    std::env::var_os("NPCNIX_NIXOS_REBUILD").unwrap_or_else(|| OsString::from("nixos-rebuild"))
+}
+
 pub fn pull(remote: &Url, dst: &Path) -> anyhow::Result<()> {
     let scheme = remote.scheme();
     let (reader, mut child) = match scheme {
@@ -95,7 +100,7 @@ pub fn activate(
         src = %src.display(),
         "Activating configuration"
     );
-    let mut cmd = process::Command::new("nixos-rebuild");
+    let mut cmd = process::Command::new(nixos_rebuild_path());
     cmd.args(["switch"]);
 
     for subscriber in &activate_opts.extra_substituters {
@@ -108,7 +113,7 @@ pub fn activate(
     cmd.args(["--flake", &format!(".#{configuration}")])
         .current_dir(src);
 
-    let status = cmd.log_debug().status()?;
+    let status = cmd.log_debug().status().context("`nixos-rebuild` failed")?;
     if !status.success() {
         bail!(
             "aws s3api get-object-attributes returned code={:?}",
@@ -160,13 +165,17 @@ fn get_etag_s3(remote: &Url) -> anyhow::Result<String> {
                 .host_str()
                 .ok_or_else(|| format_err!("Invalid URL"))?,
             "--key",
-            remote.path().split_once('/')
-                .ok_or_else(|| format_err!("Path doesn't start with a /"))?.1,
+            remote
+                .path()
+                .split_once('/')
+                .ok_or_else(|| format_err!("Path doesn't start with a /"))?
+                .1,
             "--object-attributes",
             "ETag",
         ])
         .log_debug()
-        .output()?;
+        .output()
+        .context("`aws` cli failed")?;
 
     if !output.status.success() {
         bail!(
@@ -188,7 +197,8 @@ fn pull_s3(remote: &Url) -> anyhow::Result<(impl Read, process::Child)> {
         .args(["s3", "cp", remote.as_str(), "-"])
         .stdout(Stdio::piped())
         .log_debug()
-        .spawn()?;
+        .spawn()
+        .context("`aws` cli failed")?;
 
     let stdout = child.stdout.take().unwrap();
 
@@ -200,7 +210,8 @@ fn push_s3(remote: &Url) -> anyhow::Result<(impl Write, process::Child)> {
         .args(["s3", "cp", "-", remote.as_str()])
         .stdin(Stdio::piped())
         .log_debug()
-        .spawn()?;
+        .spawn()
+        .context("`aws` cli failed")?;
 
     let stdin = child.stdin.take().unwrap();
 
@@ -292,7 +303,7 @@ pub fn follow(data_dir: &DataDir, activate_opts: &ActivateOpts, once: bool) -> a
 
         if once {
             debug!("Exiting after successful activation with `once` option");
-            return Ok(())
+            return Ok(());
         }
     }
 }
