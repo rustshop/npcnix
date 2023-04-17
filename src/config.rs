@@ -14,7 +14,7 @@ fn default_max_sleep_secs() -> u64 {
 }
 
 /// Persistent config (`/var/lib/npcnix/config.json`)
-#[derive(Serialize, Default, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     remote: Option<Url>,
     #[serde(default = "default_configuration")]
@@ -25,6 +25,17 @@ pub struct Config {
     max_sleep_secs: u64,
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            remote: None,
+            configuration: default_configuration(),
+            last_reconfiguration: chrono::Utc::now(),
+            last_etag: "".into(),
+            max_sleep_secs: default_max_sleep_secs(),
+        }
+    }
+}
 impl Config {
     pub fn load(path: &Path) -> anyhow::Result<Self> {
         Ok(serde_json::from_reader(std::fs::File::open(path)?)?)
@@ -100,7 +111,7 @@ impl Config {
         assert!(0f32 < ratio);
 
         let base_time = ratio * self.max_sleep_secs as f32;
-        let rnd_time = rand::thread_rng().gen_range(base_time * 0.5..base_time * 1.5);
+        let rnd_time = rand::thread_rng().gen_range(base_time * 0.5..=base_time * 1.5);
         assert!(0f32 < rnd_time);
 
         chrono::Duration::seconds(cmp::max(10, rnd_time as i64))
