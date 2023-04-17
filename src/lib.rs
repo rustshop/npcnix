@@ -18,6 +18,25 @@ pub mod data_dir;
 pub mod misc;
 pub mod opts;
 
+pub trait CommandExt {
+    fn log_debug(&mut self) -> &mut Self;
+}
+
+impl CommandExt for process::Command {
+    fn log_debug(&mut self) -> &mut Self {
+        debug!(
+            cmd = [self.get_program()]
+                .into_iter()
+                .chain(self.get_args())
+                .map(|s| s.to_string_lossy())
+                .collect::<Vec<_>>()
+                .join(" "),
+            "Executing command"
+        );
+        self
+    }
+}
+
 pub fn aws_cli_path() -> OsString {
     std::env::var_os("NPCNIX_AWS_CLI").unwrap_or_else(|| OsString::from("aws"))
 }
@@ -89,17 +108,7 @@ pub fn activate(
     cmd.args(["--flake", &format!(".{configuration}")])
         .current_dir(src);
 
-    debug!(
-        cmd = [cmd.get_program()]
-            .into_iter()
-            .chain(cmd.get_args())
-            .map(|s| s.to_string_lossy())
-            .collect::<Vec<_>>()
-            .join(" "),
-        "Switching configuration"
-    );
-
-    cmd.status()?;
+    cmd.log_debug().status()?;
     Ok(())
 }
 
@@ -149,12 +158,15 @@ fn get_etag_s3(remote: &Url) -> anyhow::Result<String> {
             "--object-attributes",
             "ETag",
         ])
+        .log_debug()
         .output()?;
 
     if !output.status.success() {
         bail!(
-            "s3api get-object-attributes returned code={:?}",
-            output.status.code()
+            "aws s3api get-object-attributes returned code={:?} stdout={} stderr={}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
         )
     }
     let resp: EtagResponse = serde_json::from_slice(&output.stdout)?;
@@ -168,6 +180,7 @@ fn pull_s3(remote: &Url) -> anyhow::Result<(impl Read, process::Child)> {
     let mut child = process::Command::new(aws_cli_path())
         .args(["s3", "cp", remote.as_str(), "-"])
         .stdout(Stdio::piped())
+        .log_debug()
         .spawn()?;
 
     let stdout = child.stdout.take().unwrap();
@@ -179,6 +192,7 @@ fn push_s3(remote: &Url) -> anyhow::Result<(impl Write, process::Child)> {
     let mut child = process::Command::new(aws_cli_path())
         .args(["s3", "cp", "-", remote.as_str()])
         .stdin(Stdio::piped())
+        .log_debug()
         .spawn()?;
 
     let stdin = child.stdin.take().unwrap();
