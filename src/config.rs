@@ -6,8 +6,16 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 use url::Url;
 
+fn default_min_sleep_secs() -> u64 {
+    15
+}
+
 fn default_max_sleep_secs() -> u64 {
     120
+}
+
+fn default_max_sleep_after_hours() -> u64 {
+    24
 }
 
 /// Persistent config (`/var/lib/npcnix/config.json`)
@@ -17,8 +25,12 @@ pub struct Config {
     configuration: Option<String>,
     last_reconfiguration: chrono::DateTime<chrono::Utc>,
     last_etag: String,
+    #[serde(default = "default_min_sleep_secs")]
+    min_sleep_secs: u64,
     #[serde(default = "default_max_sleep_secs")]
     max_sleep_secs: u64,
+    #[serde(default = "default_max_sleep_after_hours")]
+    max_sleep_after_hours: u64,
 }
 
 impl Default for Config {
@@ -28,10 +40,13 @@ impl Default for Config {
             configuration: None,
             last_reconfiguration: chrono::Utc::now(),
             last_etag: "".into(),
+            min_sleep_secs: default_min_sleep_secs(),
             max_sleep_secs: default_max_sleep_secs(),
+            max_sleep_after_hours: default_max_sleep_after_hours(),
         }
     }
 }
+
 impl Config {
     pub fn load(path: &Path) -> anyhow::Result<Self> {
         Ok(serde_json::from_reader(std::fs::File::open(path)?)?)
@@ -103,16 +118,19 @@ impl Config {
             chrono::Utc::now() - self.last_reconfiguration,
         );
 
-        let secs_in_a_day = 24 * 60 * 60;
-        let ratio =
-            (since_last_update.num_seconds() as f32 / secs_in_a_day as f32).clamp(0.01f32, 1f32);
-        assert!(0f32 < ratio);
+        let duration_ratio = (since_last_update.num_seconds() as f32
+            / self.max_sleep_after_hours.saturating_mul(60 * 60) as f32)
+            .clamp(0f32, 1f32);
+        assert!(0f32 <= duration_ratio);
 
-        let base_time = ratio * cmp::max(15, self.max_sleep_secs) as f32;
-        let rnd_time = rand::thread_rng().gen_range(base_time * 0.5..=base_time * 1.5);
+        let avg_duration_secs = (self.min_sleep_secs as f32
+            + duration_ratio * self.max_sleep_secs.saturating_sub(self.min_sleep_secs) as f32)
+            .clamp(0.01, 60f32 * 60f32);
+        let rnd_time =
+            rand::thread_rng().gen_range(avg_duration_secs * 0.5..=avg_duration_secs * 1.5);
         assert!(0f32 < rnd_time);
 
-        chrono::Duration::seconds(cmp::max(10, rnd_time as i64))
+        chrono::Duration::seconds(cmp::max(self.min_sleep_secs as i64, rnd_time as i64))
     }
 
     pub fn rng_sleep(&self) {
