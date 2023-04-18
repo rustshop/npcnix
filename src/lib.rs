@@ -305,6 +305,7 @@ pub fn follow(data_dir: &DataDir, activate_opts: &ActivateOpts, once: bool) -> a
         if config.is_paused() {
             info!("Paused");
             config.rng_sleep();
+            continue;
         }
 
         match follow_inner(&config, activate_opts) {
