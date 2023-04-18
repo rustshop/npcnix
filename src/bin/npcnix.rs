@@ -219,15 +219,6 @@ fn main() -> anyhow::Result<()> {
         },
         Command::Activate(ref activate_opts) => {
             if opts.data_dir().config_exist()? {
-                npcnix::activate(
-                    None,
-                    &activate_opts.src,
-                    activate_opts.configuration.as_deref().ok_or_else(|| {
-                        anyhow::format_err!("Must pass configuration to activate")
-                    })?,
-                    &activate_opts.clone().activate.into(),
-                )?;
-            } else {
                 let configuration = opts
                     .data_dir()
                     .get_current_configuration_with_opt_override(
@@ -237,6 +228,15 @@ fn main() -> anyhow::Result<()> {
                     Some(&opts.data_dir()),
                     &activate_opts.src,
                     &configuration,
+                    &activate_opts.clone().activate.into(),
+                )?;
+            } else {
+                npcnix::activate(
+                    None,
+                    &activate_opts.src,
+                    activate_opts.configuration.as_deref().ok_or_else(|| {
+                        anyhow::format_err!("Must pass configuration to activate")
+                    })?,
                     &activate_opts.clone().activate.into(),
                 )?;
             }
