@@ -45,7 +45,7 @@
         npcnixPkgWrapped = pkgs.writeShellScriptBin "npcnix" ''
           exec env \
             NPCNIX_AWS_CLI=''${NPCNIX_AWS_CLI:-${pkgs.awscli2}/bin/aws} \
-            NPCNIX_NIXOS_REBUILD=''${NPCNIX_NIXOS_REBUILD:-${pkgs.awscli2}/bin/nixos-rebuild} \
+            NPCNIX_NIXOS_REBUILD=''${NPCNIX_NIXOS_REBUILD:-${pkgs.nixos-rebuild}/bin/nixos-rebuild} \
             ${npcnixPkgUnwrapped}/bin/npcnix "$@"
         '';
       in
