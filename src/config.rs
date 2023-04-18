@@ -8,7 +8,7 @@ use tracing::debug;
 use url::Url;
 
 fn default_min_sleep_secs() -> u64 {
-    15
+    5
 }
 
 fn default_max_sleep_secs() -> u64 {
