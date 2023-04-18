@@ -65,8 +65,8 @@
                 >&2 echo "Missing configuration"
                 exit 1
               fi
-              ${npcnixPkgWrapped}/bin/npcnix set --init remote "$1"
-              ${npcnixPkgWrapped}/bin/npcnix set --init configuration "$2"
+              ${npcnixPkgWrapped}/bin/npcnix config set --init remote "$1"
+              ${npcnixPkgWrapped}/bin/npcnix config set --init configuration "$2"
 
               npcnix_swapfile="/npcnix-swapfile"
               if [ ! -e "$npcnix_swapfile" ]; then
