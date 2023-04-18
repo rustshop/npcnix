@@ -20,6 +20,7 @@ fn default_max_sleep_after_hours() -> u64 {
 }
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 #[serde(tag = "type")]
+#[serde(rename_all = "snake_case")]
 pub enum ConfigPaused {
     Indefinitely,
     Until {
@@ -50,6 +51,7 @@ impl ConfigPaused {
 
 /// Persistent config (`/var/lib/npcnix/config.json`)
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "snake_case")]
 pub struct Config {
     remote: Option<Url>,
     configuration: Option<String>,
