@@ -45,6 +45,10 @@ pub enum Command {
     /// Run as a daemon periodically activating NixOS configuration from the
     /// remote
     Follow(FollowOpts),
+    /// Permanently or temporarily pause the npcnix daemon
+    Pause(PauseOpts),
+    /// Unpause the npcnix daemon
+    Unpause,
 }
 
 #[derive(Subcommand, Debug, Clone)]
@@ -70,6 +74,16 @@ pub struct PullOpts {
     #[arg(long)]
     /// Destination directory
     dst: PathBuf,
+}
+
+#[derive(Parser, Debug, Clone)]
+pub struct PauseOpts {
+    /// Pause for this many hours
+    #[arg(long, group("duration"))]
+    hours: Option<u64>,
+
+    #[arg(long, group("duration"))]
+    minutes: Option<u64>,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -204,16 +218,28 @@ fn main() -> anyhow::Result<()> {
             },
         },
         Command::Activate(ref activate_opts) => {
-            let configuration = opts
-                .data_dir()
-                .get_current_configuration_with_opt_override(
-                    activate_opts.configuration.as_deref(),
+            if opts.data_dir().config_exist()? {
+                npcnix::activate(
+                    None,
+                    &activate_opts.src,
+                    activate_opts.configuration.as_deref().ok_or_else(|| {
+                        anyhow::format_err!("Must pass configuration to activate")
+                    })?,
+                    &activate_opts.clone().activate.into(),
                 )?;
-            npcnix::activate(
-                &activate_opts.src,
-                &configuration,
-                &activate_opts.clone().activate.into(),
-            )?;
+            } else {
+                let configuration = opts
+                    .data_dir()
+                    .get_current_configuration_with_opt_override(
+                        activate_opts.configuration.as_deref(),
+                    )?;
+                npcnix::activate(
+                    Some(&opts.data_dir()),
+                    &activate_opts.src,
+                    &configuration,
+                    &activate_opts.clone().activate.into(),
+                )?;
+            }
         }
         Command::Follow(ref follow_opts) => {
             npcnix::follow(
@@ -221,6 +247,31 @@ fn main() -> anyhow::Result<()> {
                 &follow_opts.clone().activate.into(),
                 follow_opts.once,
             )?;
+        }
+        Command::Pause(PauseOpts { hours, minutes }) => {
+            let config = opts.data_dir().load_config()?;
+
+            let config = if let Some(minutes) = minutes {
+                config.with_paused_until(
+                    chrono::Utc::now()
+                        + chrono::Duration::seconds(TryFrom::try_from(minutes.saturating_add(60))?),
+                )
+            } else if let Some(hours) = hours {
+                config.with_paused_until(
+                    chrono::Utc::now()
+                        + chrono::Duration::seconds(TryFrom::try_from(
+                            hours.saturating_add(60 * 60),
+                        )?),
+                )
+            } else {
+                config.with_paused_indefinitely()
+            };
+
+            opts.data_dir().store_config(&config)?;
+        }
+        Command::Unpause => {
+            let config = opts.data_dir().load_config()?;
+            opts.data_dir().store_config(&config.with_unpaused())?;
         }
     }
 

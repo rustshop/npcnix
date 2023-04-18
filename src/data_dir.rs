@@ -46,6 +46,10 @@ impl DataDir {
         self.path.join("config.json")
     }
 
+    pub fn config_exist(&self) -> anyhow::Result<bool> {
+        Ok(self.config_file_path().try_exists()?)
+    }
+
     pub fn load_config(&self) -> anyhow::Result<config::Config> {
         let config_path = self.config_file_path();
         if config_path.exists() {

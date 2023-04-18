@@ -91,11 +91,15 @@ pub struct ActivateOpts {
 }
 
 pub fn activate(
+    data_dir: Option<&DataDir>,
     src: &Path,
     configuration: &str,
     activate_opts: &ActivateOpts,
 ) -> Result<(), anyhow::Error> {
     activate_inner(src, configuration, activate_opts)?;
+    data_dir
+        .map(|data_dir| data_dir.update_last_reconfiguration(""))
+        .transpose()?;
     Ok(())
 }
 
@@ -297,6 +301,11 @@ pub fn follow(data_dir: &DataDir, activate_opts: &ActivateOpts, once: bool) -> a
     loop {
         // Note: we load every time, in case settings changed
         let config = data_dir.load_config()?;
+
+        if config.is_paused() {
+            info!("Paused");
+            config.rng_sleep();
+        }
 
         match follow_inner(&config, activate_opts) {
             Ok(Some(etag)) => {

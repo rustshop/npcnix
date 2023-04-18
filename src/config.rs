@@ -2,6 +2,7 @@ use std::path::Path;
 use std::{cmp, fmt, thread};
 
 use anyhow::format_err;
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 use url::Url;
@@ -17,9 +18,38 @@ fn default_max_sleep_secs() -> u64 {
 fn default_max_sleep_after_hours() -> u64 {
     24
 }
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+#[serde(tag = "type")]
+pub enum ConfigPaused {
+    Indefinitely,
+    Until {
+        until: chrono::DateTime<chrono::Utc>,
+    },
+}
+impl ConfigPaused {
+    pub fn combine(self, other: Self) -> ConfigPaused {
+        match (self, other) {
+            (ConfigPaused::Indefinitely, _) | (_, ConfigPaused::Indefinitely) => {
+                ConfigPaused::Indefinitely
+            }
+            (ConfigPaused::Until { until: until1 }, ConfigPaused::Until { until: until2 }) => {
+                Self::Until {
+                    until: cmp::max(until1, until2),
+                }
+            }
+        }
+    }
+
+    fn is_expired(self) -> bool {
+        match self {
+            ConfigPaused::Indefinitely => false,
+            ConfigPaused::Until { until } => until <= Utc::now(),
+        }
+    }
+}
 
 /// Persistent config (`/var/lib/npcnix/config.json`)
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
     remote: Option<Url>,
     configuration: Option<String>,
@@ -31,6 +61,8 @@ pub struct Config {
     max_sleep_secs: u64,
     #[serde(default = "default_max_sleep_after_hours")]
     max_sleep_after_hours: u64,
+
+    paused: Option<ConfigPaused>,
 }
 
 impl Default for Config {
@@ -43,17 +75,29 @@ impl Default for Config {
             min_sleep_secs: default_min_sleep_secs(),
             max_sleep_secs: default_max_sleep_secs(),
             max_sleep_after_hours: default_max_sleep_after_hours(),
+            paused: None,
         }
     }
 }
 
 impl Config {
     pub fn load(path: &Path) -> anyhow::Result<Self> {
-        Ok(serde_json::from_reader(std::fs::File::open(path)?)?)
+        Ok(serde_json::from_reader::<_, Self>(std::fs::File::open(path)?)?.expire_paused())
     }
 
     pub fn store(&self, path: &Path) -> anyhow::Result<()> {
-        crate::misc::store_json_pretty_to_file(path, self)
+        crate::misc::store_json_pretty_to_file(path, &self.clone().expire_paused())
+    }
+
+    pub fn expire_paused(self) -> Self {
+        if self.is_paused() {
+            self
+        } else {
+            Self {
+                paused: None,
+                ..self
+            }
+        }
     }
 
     pub fn with_configuration(self, configuration: &str) -> Self {
@@ -78,6 +122,38 @@ impl Config {
             remote: Some(remote.clone()),
             ..self
         }
+    }
+
+    pub fn with_paused_until(self, until: chrono::DateTime<chrono::Utc>) -> Self {
+        let until = ConfigPaused::Until { until };
+        Self {
+            paused: Some(
+                self.paused
+                    .map(|current| current.combine(until))
+                    .unwrap_or(until),
+            ),
+            ..self
+        }
+    }
+
+    pub fn with_paused_indefinitely(self) -> Self {
+        Self {
+            paused: Some(ConfigPaused::Indefinitely),
+            ..self
+        }
+    }
+
+    pub fn with_unpaused(self) -> Self {
+        Self {
+            paused: None,
+            ..self
+        }
+    }
+
+    pub fn is_paused(&self) -> bool {
+        self.paused
+            .map(|paused| !paused.is_expired())
+            .unwrap_or(false)
     }
 
     /// Like [`Self:with_remote`] but if `init` is `true` will not overwrite the
