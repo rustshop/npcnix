@@ -115,7 +115,7 @@ fn activate_inner(
         "Activating configuration"
     );
     let mut cmd = process::Command::new(nixos_rebuild_path());
-    cmd.args(["switch"]);
+    cmd.args(["switch", "-L"]);
 
     for subscriber in &activate_opts.extra_substituters {
         cmd.args(["--option", "extra-substituters", subscriber]);
