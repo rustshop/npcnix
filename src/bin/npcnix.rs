@@ -34,14 +34,14 @@ pub enum Command {
         #[command(subcommand)]
         command: Option<ConfigOpts>,
     },
-    /// Pack a Nix Flake in a directory into a file
+    /// Activate a NixOS configuration from a Nix Flake in a local directory
+    Activate(ActivateOpts),
+    /// Pack a Nix Flake in a local directory into a remote-like packed Nix Flake file
     Pack(PackOpts),
     /// Pull a packed Nix Flake from a remote and extra to a directory
     Pull(PullOpts),
-    /// Pack a Nix Flake in a directory into a file and upload to a remote
+    /// Pack a Nix Flake in a local directory into a packed Nix Flake file and upload to a remote
     Push(PushOpts),
-    /// Activate a NixOS configuration from a Nix Flake in a directory
-    Activate(ActivateOpts),
     /// Run as a daemon periodically activating NixOS configuration from the
     /// remote
     Follow(FollowOpts),

@@ -8,9 +8,10 @@ use std::path::Path;
 use std::process::{self, Stdio};
 
 use anyhow::{bail, format_err, Context};
+use config::Config;
 use data_dir::DataDir;
 use serde::Deserialize;
-use tracing::{debug, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 use url::Url;
 
 pub mod config;
@@ -90,6 +91,15 @@ pub struct ActivateOpts {
 }
 
 pub fn activate(
+    src: &Path,
+    configuration: &str,
+    activate_opts: &ActivateOpts,
+) -> Result<(), anyhow::Error> {
+    activate_inner(src, configuration, activate_opts)?;
+    Ok(())
+}
+
+fn activate_inner(
     src: &Path,
     configuration: &str,
     activate_opts: &ActivateOpts,
@@ -286,24 +296,41 @@ fn pack_archive_from(
 pub fn follow(data_dir: &DataDir, activate_opts: &ActivateOpts, once: bool) -> anyhow::Result<()> {
     loop {
         // Note: we load every time, in case settings changed
-        let config = &data_dir.load_config()?;
+        let config = data_dir.load_config()?;
+
+        match follow_inner(&config, activate_opts) {
+            Ok(Some(etag)) => {
+                data_dir.update_last_reconfiguration(&etag)?;
+                info!(etag, "Successfully activated new configuration");
+
+                if once {
+                    debug!("Exiting after successful activation with `once` option");
+                    return Ok(());
+                }
+            }
+            Ok(None) => {
+                info!("Remote not changed");
+            }
+            Err(e) => error!(error = %e, "Failed to activate new configuration"),
+        }
+
         config.rng_sleep();
-
-        let etag = self::get_etag(config.remote()?)?;
-
-        if config.last_etag() == etag {
-            info!("Remote not changed");
-            continue;
-        }
-
-        let tmp_dir = tempfile::TempDir::new()?;
-        self::pull(config.remote()?, tmp_dir.path())?;
-        self::activate(tmp_dir.path(), config.configuration()?, activate_opts)?;
-        data_dir.update_last_reconfiguration(&etag)?;
-
-        if once {
-            debug!("Exiting after successful activation with `once` option");
-            return Ok(());
-        }
     }
+}
+
+pub fn follow_inner(
+    config: &Config,
+    activate_opts: &ActivateOpts,
+) -> anyhow::Result<Option<String>> {
+    let etag = self::get_etag(config.remote()?)?;
+
+    if config.last_etag() == etag {
+        return Ok(None);
+    }
+
+    let tmp_dir = tempfile::TempDir::new()?;
+    self::pull(config.remote()?, tmp_dir.path())?;
+    self::activate_inner(tmp_dir.path(), config.configuration()?, activate_opts)?;
+
+    Ok(Some(etag))
 }
