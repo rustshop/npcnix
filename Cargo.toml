@@ -20,6 +20,7 @@ md-5 = "0.10.5"
 rand = "0.8.5"
 serde = { version = "1.0.160", features = ["derive"] }
 serde_json = "1.0.95"
+signal-hook = "0.3.15"
 tar = "0.4.38"
 tempfile = "3.5.0"
 tracing = "0.1.37"

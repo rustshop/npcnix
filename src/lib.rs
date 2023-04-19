@@ -6,11 +6,15 @@ use std::fs;
 use std::io::{self, Read, Write};
 use std::path::Path;
 use std::process::{self, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use anyhow::{bail, format_err, Context};
 use config::Config;
 use data_dir::DataDir;
 use serde::Deserialize;
+use signal_hook::consts::TERM_SIGNALS;
+use signal_hook::flag;
 use tracing::{debug, error, info, trace, warn};
 use url::Url;
 
@@ -298,34 +302,50 @@ fn pack_archive_from(
 }
 
 pub fn follow(data_dir: &DataDir, activate_opts: &ActivateOpts, once: bool) -> anyhow::Result<()> {
-    loop {
+    let shutdown_requested = Arc::new(AtomicBool::new(false));
+    let shutdown_on_signal = Arc::new(AtomicBool::new(false));
+
+    for sig in TERM_SIGNALS {
+        // On first signal, mark shutdown as requested
+        flag::register(*sig, Arc::clone(&shutdown_requested))?;
+        // Also make the second signal shutdown immediately
+        flag::register(*sig, Arc::clone(&shutdown_on_signal))?;
+
+        // If shutdown_on_signal was already set, shutdown immediately on signal
+        flag::register_conditional_shutdown(*sig, 1, Arc::clone(&shutdown_on_signal))?;
+    }
+
+    while !shutdown_requested.load(Ordering::SeqCst) {
         // Note: we load every time, in case settings changed
         let config = data_dir.load_config()?;
 
         if config.is_paused() {
             info!("Paused");
-            config.rng_sleep();
             continue;
-        }
+        } else {
+            match follow_inner(&config, activate_opts) {
+                Ok(Some(etag)) => {
+                    data_dir.update_last_reconfiguration(&etag)?;
+                    info!(etag, "Successfully activated new configuration");
 
-        match follow_inner(&config, activate_opts) {
-            Ok(Some(etag)) => {
-                data_dir.update_last_reconfiguration(&etag)?;
-                info!(etag, "Successfully activated new configuration");
-
-                if once {
-                    debug!("Exiting after successful activation with `once` option");
-                    return Ok(());
+                    if once {
+                        debug!("Exiting after successful activation with `once` option");
+                        return Ok(());
+                    }
                 }
+                Ok(None) => {
+                    info!("Remote not changed");
+                }
+                Err(e) => error!(error = %e, "Failed to activate new configuration"),
             }
-            Ok(None) => {
-                info!("Remote not changed");
-            }
-            Err(e) => error!(error = %e, "Failed to activate new configuration"),
         }
 
+        // During sleep, shutdown immediately on any signal
+        shutdown_on_signal.store(true, Ordering::SeqCst);
         config.rng_sleep();
+        shutdown_on_signal.store(false, Ordering::SeqCst);
     }
+    Ok(())
 }
 
 pub fn follow_inner(
