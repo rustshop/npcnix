@@ -131,12 +131,12 @@ fn activate_inner(
     cmd.args(["--flake", &format!(".#{configuration}")])
         .current_dir(src);
 
-    let status = cmd.log_debug().status().context("`nixos-rebuild` failed")?;
+    let status = cmd
+        .log_debug()
+        .status()
+        .context("Calling `nixos-rebuild` failed")?;
     if !status.success() {
-        bail!(
-            "aws s3api get-object-attributes returned code={:?}",
-            status.code(),
-        )
+        bail!("nixos-rebuild returned exit code={:?}", status.code());
     }
     Ok(())
 }
