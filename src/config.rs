@@ -65,6 +65,7 @@ pub struct Config {
     #[serde(default = "default_max_sleep_after_hours")]
     max_sleep_after_hours: u64,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
     paused: Option<ConfigPaused>,
 }
 
