@@ -64,7 +64,7 @@
                 ${pkgs.coreutils}/bin/rm -f "$npcnix_swapfile" || true
               }
               if [ ! -e "$npcnix_swapfile" ]; then
-                ${pkgs.util-linux}/bin/fallocate -l 1G "$npcnix_swapfile" || true
+                ${pkgs.util-linux}/bin/fallocate -l 2G "$npcnix_swapfile" || true
               fi
               trap cleanup EXIT
               chmod 600 "$npcnix_swapfile" && \
