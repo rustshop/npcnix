@@ -301,7 +301,12 @@ fn pack_archive_from(
     Ok(())
 }
 
-pub fn follow(data_dir: &DataDir, activate_opts: &ActivateOpts, once: bool) -> anyhow::Result<()> {
+pub fn follow(
+    data_dir: &DataDir,
+    activate_opts: &ActivateOpts,
+    override_configuration: Option<&str>,
+    once: bool,
+) -> anyhow::Result<()> {
     let shutdown_requested = Arc::new(AtomicBool::new(false));
     let shutdown_on_signal = Arc::new(AtomicBool::new(false));
 
@@ -323,7 +328,7 @@ pub fn follow(data_dir: &DataDir, activate_opts: &ActivateOpts, once: bool) -> a
             info!("Paused");
             continue;
         } else {
-            match follow_inner(&config, activate_opts) {
+            match follow_inner(&config, activate_opts, override_configuration) {
                 Ok(Some(etag)) => {
                     data_dir.update_last_reconfiguration(&etag)?;
                     info!(etag, "Successfully activated new configuration");
@@ -351,6 +356,7 @@ pub fn follow(data_dir: &DataDir, activate_opts: &ActivateOpts, once: bool) -> a
 pub fn follow_inner(
     config: &Config,
     activate_opts: &ActivateOpts,
+    override_configuration: Option<&str>,
 ) -> anyhow::Result<Option<String>> {
     let etag = self::get_etag(config.remote()?)?;
 
@@ -360,7 +366,13 @@ pub fn follow_inner(
 
     let tmp_dir = tempfile::TempDir::new()?;
     self::pull(config.remote()?, tmp_dir.path())?;
-    self::activate_inner(tmp_dir.path(), config.configuration()?, activate_opts)?;
+    self::activate_inner(
+        tmp_dir.path(),
+        override_configuration
+            .map(Ok)
+            .unwrap_or_else(|| config.configuration())?,
+        activate_opts,
+    )?;
 
     Ok(Some(etag))
 }

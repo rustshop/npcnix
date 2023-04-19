@@ -114,12 +114,16 @@ pub struct ActivateOpts {
 #[derive(Parser, Debug, Clone)]
 pub struct InstallOpts {
     #[arg(long)]
-    /// Remote to use
+    /// Remote to use for the host
     remote: Url,
 
     #[arg(long)]
-    /// Configuration to apply
+    /// Configuration to use for the host
     configuration: String,
+
+    #[arg(long)]
+    /// Configuration to activate (as an intermediate step)
+    initial_configuration: Option<String>,
 
     #[command(flatten)]
     activate: ActivateCommonOpts,
@@ -261,6 +265,7 @@ fn main() -> anyhow::Result<()> {
             npcnix::follow(
                 &opts.data_dir(),
                 &follow_opts.clone().activate.into(),
+                None,
                 follow_opts.once,
             )?;
         }
@@ -292,6 +297,7 @@ fn main() -> anyhow::Result<()> {
         Command::Install(InstallOpts {
             ref remote,
             ref configuration,
+            ref initial_configuration,
             ref activate,
         }) => {
             opts.data_dir().store_config(
@@ -302,7 +308,12 @@ fn main() -> anyhow::Result<()> {
                     .with_configuration(configuration),
             )?;
 
-            npcnix::follow(&opts.data_dir(), &activate.clone().into(), true)?;
+            npcnix::follow(
+                &opts.data_dir(),
+                &activate.clone().into(),
+                initial_configuration.as_deref(),
+                true,
+            )?;
         }
     }
 

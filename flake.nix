@@ -64,6 +64,8 @@
                 ${pkgs.coreutils}/bin/rm -f "$npcnix_swapfile" || true
               }
               if [ ! -e "$npcnix_swapfile" ]; then
+                # it has been experimentally verified, that 2G should be enough
+                # bootstrap even on AWS EC2 t3.nano instances
                 ${pkgs.util-linux}/bin/fallocate -l 2G "$npcnix_swapfile" || true
               fi
               trap cleanup EXIT
