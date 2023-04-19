@@ -67,7 +67,15 @@ impl DataDir {
             .context("Failed to store config")
     }
 
-    pub fn update_last_reconfiguration(&self, etag: &str) -> anyhow::Result<()> {
-        self.store_config(&self.load_config()?.with_updated_last_reconfiguration(etag))
+    pub fn update_last_reconfiguration(
+        &self,
+        configuration: &str,
+        etag: &str,
+    ) -> anyhow::Result<()> {
+        self.store_config(
+            &self
+                .load_config()?
+                .with_updated_last_reconfiguration(configuration, etag),
+        )
     }
 }

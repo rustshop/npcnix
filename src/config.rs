@@ -57,6 +57,7 @@ pub struct Config {
     configuration: Option<String>,
     last_reconfiguration: chrono::DateTime<chrono::Utc>,
     last_etag: String,
+    last_configuration: String,
     #[serde(default = "default_min_sleep_secs")]
     min_sleep_secs: u64,
     #[serde(default = "default_max_sleep_secs")]
@@ -74,6 +75,7 @@ impl Default for Config {
             configuration: None,
             last_reconfiguration: chrono::Utc::now(),
             last_etag: "".into(),
+            last_configuration: "".into(),
             min_sleep_secs: default_min_sleep_secs(),
             max_sleep_secs: default_max_sleep_secs(),
             max_sleep_after_hours: default_max_sleep_after_hours(),
@@ -168,8 +170,9 @@ impl Config {
         }
     }
 
-    pub fn with_updated_last_reconfiguration(self, etag: &str) -> Self {
+    pub fn with_updated_last_reconfiguration(self, configuration: &str, etag: &str) -> Self {
         Self {
+            last_configuration: configuration.to_owned(),
             last_etag: etag.to_owned(),
             last_reconfiguration: chrono::Utc::now(),
             ..self
@@ -215,6 +218,10 @@ impl Config {
         let duration = self.cur_rng_sleep_time();
         debug!(duration = %duration, "Sleeping");
         thread::sleep(duration.to_std().expect("Can't be negative"));
+    }
+
+    pub fn last_configuration(&self) -> &str {
+        &self.last_configuration
     }
 
     pub fn last_etag(&self) -> &str {

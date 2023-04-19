@@ -102,7 +102,7 @@ pub fn activate(
 ) -> Result<(), anyhow::Error> {
     activate_inner(src, configuration, activate_opts)?;
     data_dir
-        .map(|data_dir| data_dir.update_last_reconfiguration(""))
+        .map(|data_dir| data_dir.update_last_reconfiguration(configuration, ""))
         .transpose()?;
     Ok(())
 }
@@ -329,8 +329,8 @@ pub fn follow(
             continue;
         } else {
             match follow_inner(&config, activate_opts, override_configuration) {
-                Ok(Some(etag)) => {
-                    data_dir.update_last_reconfiguration(&etag)?;
+                Ok(Some((configuration, etag))) => {
+                    data_dir.update_last_reconfiguration(&configuration, &etag)?;
                     info!(etag, "Successfully activated new configuration");
 
                     if once {
@@ -357,22 +357,20 @@ pub fn follow_inner(
     config: &Config,
     activate_opts: &ActivateOpts,
     override_configuration: Option<&str>,
-) -> anyhow::Result<Option<String>> {
+) -> anyhow::Result<Option<(String, String)>> {
+    let configuration = override_configuration
+        .map(Ok)
+        .unwrap_or_else(|| config.configuration())?;
+
     let etag = self::get_etag(config.remote()?)?;
 
-    if config.last_etag() == etag {
+    if config.last_configuration() == configuration && config.last_etag() == etag {
         return Ok(None);
     }
 
     let tmp_dir = tempfile::TempDir::new()?;
     self::pull(config.remote()?, tmp_dir.path())?;
-    self::activate_inner(
-        tmp_dir.path(),
-        override_configuration
-            .map(Ok)
-            .unwrap_or_else(|| config.configuration())?,
-        activate_opts,
-    )?;
+    self::activate_inner(tmp_dir.path(), configuration, activate_opts)?;
 
-    Ok(Some(etag))
+    Ok(Some((configuration.to_string(), etag)))
 }
