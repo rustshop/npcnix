@@ -42,6 +42,8 @@ pub enum Command {
     Pull(PullOpts),
     /// Pack a Nix Flake in a local directory into a packed Nix Flake file and upload to a remote
     Push(PushOpts),
+    /// Install npcnix on the machine
+    Install(InstallOpts),
     /// Run as a daemon periodically activating NixOS configuration from the
     /// remote
     Follow(FollowOpts),
@@ -104,6 +106,20 @@ pub struct ActivateOpts {
     #[arg(long)]
     /// Configuration to apply
     configuration: Option<String>,
+
+    #[command(flatten)]
+    activate: ActivateCommonOpts,
+}
+
+#[derive(Parser, Debug, Clone)]
+pub struct InstallOpts {
+    #[arg(long)]
+    /// Remote to use
+    remote: Url,
+
+    #[arg(long)]
+    /// Configuration to apply
+    configuration: String,
 
     #[command(flatten)]
     activate: ActivateCommonOpts,
@@ -272,6 +288,21 @@ fn main() -> anyhow::Result<()> {
         Command::Unpause => {
             let config = opts.data_dir().load_config()?;
             opts.data_dir().store_config(&config.with_unpaused())?;
+        }
+        Command::Install(InstallOpts {
+            ref remote,
+            ref configuration,
+            ref activate,
+        }) => {
+            opts.data_dir().store_config(
+                &opts
+                    .data_dir()
+                    .load_config()?
+                    .with_remote(remote)
+                    .with_configuration(configuration),
+            )?;
+
+            npcnix::follow(&opts.data_dir(), &activate.clone().into(), true)?;
         }
     }
 

@@ -57,27 +57,22 @@
             npcnix = npcnixPkgWrapped;
             install = pkgs.writeShellScriptBin "npcnix-install" ''
               set -e
-              if [ -z "$1" ]; then
-                >&2 echo "Missing remote"
-                exit 1
-              fi
-              if [ -z "$2" ]; then
-                >&2 echo "Missing configuration"
-                exit 1
-              fi
-              ${npcnixPkgWrapped}/bin/npcnix config set --init remote "$1"
-              ${npcnixPkgWrapped}/bin/npcnix config set --init configuration "$2"
-
               npcnix_swapfile="/npcnix-swapfile"
+
+              function cleanup() {
+                ${pkgs.util-linux}/bin/swapoff "$npcnix_swapfile" || true
+                ${pkgs.coreutils}/bin/rm -f "$npcnix_swapfile" || true
+              }
               if [ ! -e "$npcnix_swapfile" ]; then
                 ${pkgs.util-linux}/bin/fallocate -l 1G "$npcnix_swapfile" || true
               fi
+              trap cleanup EXIT
               chmod 600 "$npcnix_swapfile" && \
                 ${pkgs.util-linux}/bin/mkswap "$npcnix_swapfile" && \
-                ${pkgs.util-linux}/bin/swapon "$npcnix_swapfile" && \
+                ${pkgs.util-linux}/bin/swapon "$npcnix_swapfile" || \
                 true
 
-              ${npcnixPkgWrapped}/bin/npcnix follow --once
+              ${npcnixPkgWrapped}/bin/npcnix install "$@"
             '';
           };
 
