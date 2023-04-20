@@ -18,6 +18,16 @@ impl DataDir {
         }
     }
 
+    pub fn lock(&self) -> anyhow::Result<Option<fd_lock::RwLock<fs::File>>> {
+        if self.config_exist()? {
+            Ok(Some(fd_lock::RwLock::new(fs::File::open(
+                self.config_file_path(),
+            )?)))
+        } else {
+            Ok(None)
+        }
+    }
+
     /// Load currently configured `remote` from config if not overridden
     pub fn get_current_remote_with_opt_override(
         &self,

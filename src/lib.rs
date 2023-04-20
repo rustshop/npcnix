@@ -321,33 +321,10 @@ pub fn follow(
     }
 
     while !shutdown_requested.load(Ordering::SeqCst) {
-        // Note: we load every time, in case settings changed
+        follow_inner(data_dir, activate_opts, override_configuration, once)?;
+
+        // reload the config, just in case it changed in the meantime
         let config = data_dir.load_config()?;
-
-        if config.is_paused() {
-            info!("Paused");
-            continue;
-        } else {
-            match follow_inner(&config, activate_opts, override_configuration) {
-                Ok(res) => {
-                    match res {
-                        Some((configuration, etag)) => {
-                            data_dir.update_last_reconfiguration(&configuration, &etag)?;
-                            info!(etag, "Successfully activated new configuration");
-                        }
-                        None => {
-                            info!("Remote not changed");
-                        }
-                    }
-                    if once {
-                        debug!("Exiting after successful activation with `once` option");
-                        return Ok(());
-                    }
-                }
-                Err(e) => error!(error = %e, "Failed to activate new configuration"),
-            }
-        }
-
         // During sleep, shutdown immediately on any signal
         shutdown_on_signal.store(true, Ordering::SeqCst);
         config.rng_sleep();
@@ -356,7 +333,43 @@ pub fn follow(
     Ok(())
 }
 
-pub fn follow_inner(
+fn follow_inner(
+    data_dir: &DataDir,
+    activate_opts: &ActivateOpts,
+    override_configuration: Option<&str>,
+    once: bool,
+) -> Result<(), anyhow::Error> {
+    let mut lock = data_dir.lock()?;
+    let _lock = lock.as_mut().map(|lock| lock.write()).transpose()?;
+    // Note: we load every time, in case settings changed
+    let config = data_dir.load_config()?;
+
+    if config.is_paused() {
+        info!("Paused");
+    } else {
+        match follow_inner_try(&config, activate_opts, override_configuration) {
+            Ok(res) => {
+                match res {
+                    Some((configuration, etag)) => {
+                        data_dir.update_last_reconfiguration(&configuration, &etag)?;
+                        info!(etag, "Successfully activated new configuration");
+                    }
+                    None => {
+                        info!("Remote not changed");
+                    }
+                }
+                if once {
+                    debug!("Exiting after successful activation with `once` option");
+                    return Ok(());
+                }
+            }
+            Err(e) => error!(error = %e, "Failed to activate new configuration"),
+        }
+    }
+    Ok(())
+}
+
+pub fn follow_inner_try(
     config: &Config,
     activate_opts: &ActivateOpts,
     override_configuration: Option<&str>,
