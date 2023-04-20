@@ -96,12 +96,12 @@ pub struct ActivateOpts {
     pub extra_trusted_public_keys: Vec<String>,
 }
 
-pub fn with_rebuilding_lock<T>(
+pub fn with_activate_lock<T>(
     data_dir: Option<&DataDir>,
     f: impl FnOnce() -> anyhow::Result<T>,
 ) -> anyhow::Result<T> {
     let mut lock = data_dir
-        .map(|data_dir| data_dir.lock())
+        .map(|data_dir| data_dir.activate_lock())
         .transpose()?
         .flatten();
 
@@ -109,7 +109,7 @@ pub fn with_rebuilding_lock<T>(
     // `try_write` first, then `write` if previous one failed, on the same
     // locked file. So we open same files twice instead.
     let mut lock2 = data_dir
-        .map(|data_dir| data_dir.lock())
+        .map(|data_dir| data_dir.activate_lock())
         .transpose()?
         .flatten();
 
@@ -122,6 +122,7 @@ pub fn with_rebuilding_lock<T>(
                 return Err(e)?;
             }
 
+            warn!("Waiting for another instance to finish");
             lock2.as_mut().map(|lock| lock.write()).transpose()?
         }
     };
@@ -135,7 +136,7 @@ pub fn activate(
     configuration: &str,
     activate_opts: &ActivateOpts,
 ) -> Result<(), anyhow::Error> {
-    with_rebuilding_lock(data_dir, || {
+    with_activate_lock(data_dir, || {
         // Note: we load every time, in case settings changed
         activate_inner(src, configuration, activate_opts)?;
         data_dir
@@ -381,7 +382,7 @@ fn follow_inner(
     override_configuration: Option<&str>,
     once: bool,
 ) -> Result<ControlFlow<(), ()>, anyhow::Error> {
-    with_rebuilding_lock(Some(data_dir), || {
+    with_activate_lock(Some(data_dir), || {
         // Note: we load every time, in case settings changed
         let config = data_dir.load_config()?;
 

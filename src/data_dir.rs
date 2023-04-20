@@ -18,10 +18,10 @@ impl DataDir {
         }
     }
 
-    pub fn lock(&self) -> anyhow::Result<Option<fd_lock::RwLock<fs::File>>> {
+    pub fn activate_lock(&self) -> anyhow::Result<Option<fd_lock::RwLock<fs::File>>> {
         if self.config_exist()? {
-            Ok(Some(fd_lock::RwLock::new(fs::File::open(
-                self.config_file_path(),
+            Ok(Some(fd_lock::RwLock::new(fs::File::create(
+                self.path.join("activate.lock"),
             )?)))
         } else {
             Ok(None)
