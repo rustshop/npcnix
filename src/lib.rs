@@ -329,17 +329,20 @@ pub fn follow(
             continue;
         } else {
             match follow_inner(&config, activate_opts, override_configuration) {
-                Ok(Some((configuration, etag))) => {
-                    data_dir.update_last_reconfiguration(&configuration, &etag)?;
-                    info!(etag, "Successfully activated new configuration");
-
+                Ok(res) => {
+                    match res {
+                        Some((configuration, etag)) => {
+                            data_dir.update_last_reconfiguration(&configuration, &etag)?;
+                            info!(etag, "Successfully activated new configuration");
+                        }
+                        None => {
+                            info!("Remote not changed");
+                        }
+                    }
                     if once {
                         debug!("Exiting after successful activation with `once` option");
                         return Ok(());
                     }
-                }
-                Ok(None) => {
-                    info!("Remote not changed");
                 }
                 Err(e) => error!(error = %e, "Failed to activate new configuration"),
             }
