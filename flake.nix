@@ -57,16 +57,20 @@
             npcnix = npcnixPkgWrapped;
             install = pkgs.writeShellScriptBin "npcnix-install" ''
               set -e
-              npcnix_swapfile="/npcnix-swapfile"
+              npcnix_swapfile="/npcnix-install-swapfile"
 
               function cleanup() {
                 ${pkgs.util-linux}/bin/swapoff "$npcnix_swapfile" || true
                 ${pkgs.coreutils}/bin/rm -f "$npcnix_swapfile" || true
               }
-              if [ ! -e "$npcnix_swapfile" ]; then
-                # it has been experimentally verified, that 2G should be enough
-                # bootstrap even on AWS EC2 t3.nano instances
-                ${pkgs.util-linux}/bin/fallocate -l 2G "$npcnix_swapfile" || true
+
+              if [ "$(${pkgs.util-linux}/bin/swapon --noheadings --raw | ${pkgs.coreutils}/bin/wc -l )" = "0" ] ; then
+                >&2 "No swap detected. Creating a temporary swap device..."
+                if [ ! -e "$npcnix_swapfile" ]; then
+                  # it has been experimentally verified, that 2G should be enough
+                  # bootstrap even on AWS EC2 t3.nano instances
+                  ${pkgs.util-linux}/bin/fallocate -l 2G "$npcnix_swapfile" || true
+                fi
               fi
               trap cleanup EXIT
               chmod 600 "$npcnix_swapfile" && \
