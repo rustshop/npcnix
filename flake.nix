@@ -61,6 +61,7 @@
 
               function cleanup() {
                 if [ ! -e "$npcnix_swapfile" ]; then
+                  >&2 echo "Cleaning up temporary swap file..."
                   ${pkgs.util-linux}/bin/swapoff "$npcnix_swapfile" || true
                   ${pkgs.coreutils}/bin/rm -f "$npcnix_swapfile" || true
                 fi
@@ -69,7 +70,7 @@
               trap cleanup EXIT
 
               if [ "$(${pkgs.util-linux}/bin/swapon --noheadings --raw | ${pkgs.coreutils}/bin/wc -l )" = "0" ] ; then
-                >&2 "No swap detected. Creating a temporary swap device..."
+                >&2 echo "No swap detected. Creating a temporary swap file..."
                 if [ ! -e "$npcnix_swapfile" ]; then
                   # it has been experimentally verified, that 2G should be enough
                   # bootstrap even on AWS EC2 t3.nano instances
