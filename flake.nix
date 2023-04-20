@@ -60,7 +60,7 @@
               npcnix_swapfile="/npcnix-install-swapfile"
 
               function cleanup() {
-                if [ ! -e "$npcnix_swapfile" ]; then
+                if [ -e "$npcnix_swapfile" ]; then
                   >&2 echo "Cleaning up temporary swap file..."
                   ${pkgs.util-linux}/bin/swapoff "$npcnix_swapfile" || true
                   ${pkgs.coreutils}/bin/rm -f "$npcnix_swapfile" || true
