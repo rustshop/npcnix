@@ -12,6 +12,7 @@ use std::sync::Arc;
 use anyhow::{bail, format_err, Context};
 use config::Config;
 use data_dir::DataDir;
+
 use serde::Deserialize;
 use signal_hook::consts::TERM_SIGNALS;
 use signal_hook::flag;
@@ -94,16 +95,52 @@ pub struct ActivateOpts {
     pub extra_trusted_public_keys: Vec<String>,
 }
 
+pub fn with_rebuilding_lock<T>(
+    data_dir: Option<&DataDir>,
+    f: impl FnOnce() -> anyhow::Result<T>,
+) -> anyhow::Result<T> {
+    let mut lock = data_dir
+        .map(|data_dir| data_dir.lock())
+        .transpose()?
+        .flatten();
+
+    // Workaround: due to &mut aliasing limitations, it seems impossible to
+    // `try_write` first, then `write` if previous one failed, on the same
+    // locked file. So we open same files twice instead.
+    let mut lock2 = data_dir
+        .map(|data_dir| data_dir.lock())
+        .transpose()?
+        .flatten();
+
+    let _lock = match lock.as_mut().map(|lock| lock.try_write()).transpose() {
+        Ok(_lock) => {
+            return f();
+        }
+        Err(e) => {
+            if e.kind() != io::ErrorKind::WouldBlock {
+                return Err(e)?;
+            }
+
+            lock2.as_mut().map(|lock| lock.write()).transpose()?
+        }
+    };
+
+    f()
+}
+
 pub fn activate(
     data_dir: Option<&DataDir>,
     src: &Path,
     configuration: &str,
     activate_opts: &ActivateOpts,
 ) -> Result<(), anyhow::Error> {
-    activate_inner(src, configuration, activate_opts)?;
-    data_dir
-        .map(|data_dir| data_dir.update_last_reconfiguration(configuration, ""))
-        .transpose()?;
+    with_rebuilding_lock(data_dir, || {
+        // Note: we load every time, in case settings changed
+        activate_inner(src, configuration, activate_opts)?;
+        data_dir
+            .map(|data_dir| data_dir.update_last_reconfiguration(configuration, ""))
+            .transpose()
+    })?;
     Ok(())
 }
 
@@ -339,34 +376,34 @@ fn follow_inner(
     override_configuration: Option<&str>,
     once: bool,
 ) -> Result<(), anyhow::Error> {
-    let mut lock = data_dir.lock()?;
-    let _lock = lock.as_mut().map(|lock| lock.write()).transpose()?;
-    // Note: we load every time, in case settings changed
-    let config = data_dir.load_config()?;
+    with_rebuilding_lock(Some(data_dir), || {
+        // Note: we load every time, in case settings changed
+        let config = data_dir.load_config()?;
 
-    if config.is_paused() {
-        info!("Paused");
-    } else {
-        match follow_inner_try(&config, activate_opts, override_configuration) {
-            Ok(res) => {
-                match res {
-                    Some((configuration, etag)) => {
-                        data_dir.update_last_reconfiguration(&configuration, &etag)?;
-                        info!(etag, "Successfully activated new configuration");
+        if config.is_paused() {
+            info!("Paused");
+        } else {
+            match follow_inner_try(&config, activate_opts, override_configuration) {
+                Ok(res) => {
+                    match res {
+                        Some((configuration, etag)) => {
+                            data_dir.update_last_reconfiguration(&configuration, &etag)?;
+                            info!(etag, "Successfully activated new configuration");
+                        }
+                        None => {
+                            info!("Remote not changed");
+                        }
                     }
-                    None => {
-                        info!("Remote not changed");
+                    if once {
+                        debug!("Exiting after successful activation with `once` option");
+                        return Ok(());
                     }
                 }
-                if once {
-                    debug!("Exiting after successful activation with `once` option");
-                    return Ok(());
-                }
+                Err(e) => error!(error = %e, "Failed to activate new configuration"),
             }
-            Err(e) => error!(error = %e, "Failed to activate new configuration"),
         }
-    }
-    Ok(())
+        Ok(())
+    })
 }
 
 pub fn follow_inner_try(
