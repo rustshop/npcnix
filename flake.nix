@@ -63,6 +63,8 @@
                 ${pkgs.util-linux}/bin/swapoff "$npcnix_swapfile" || true
                 ${pkgs.coreutils}/bin/rm -f "$npcnix_swapfile" || true
               }
+              # clean unconditionally, in case we left over something in a previous run, etc.
+              trap cleanup EXIT
 
               if [ "$(${pkgs.util-linux}/bin/swapon --noheadings --raw | ${pkgs.coreutils}/bin/wc -l )" = "0" ] ; then
                 >&2 "No swap detected. Creating a temporary swap device..."
@@ -71,14 +73,14 @@
                   # bootstrap even on AWS EC2 t3.nano instances
                   ${pkgs.util-linux}/bin/fallocate -l 2G "$npcnix_swapfile" || true
                 fi
+                chmod 600 "$npcnix_swapfile" && \
+                  ${pkgs.util-linux}/bin/mkswap "$npcnix_swapfile" && \
+                  ${pkgs.util-linux}/bin/swapon "$npcnix_swapfile" || \
+                  true
               fi
-              trap cleanup EXIT
-              chmod 600 "$npcnix_swapfile" && \
-                ${pkgs.util-linux}/bin/mkswap "$npcnix_swapfile" && \
-                ${pkgs.util-linux}/bin/swapon "$npcnix_swapfile" || \
-                true
 
               ${npcnixPkgWrapped}/bin/npcnix install "$@"
+              cleanup
             '';
           };
 
