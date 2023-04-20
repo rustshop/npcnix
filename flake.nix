@@ -60,8 +60,10 @@
               npcnix_swapfile="/npcnix-install-swapfile"
 
               function cleanup() {
-                ${pkgs.util-linux}/bin/swapoff "$npcnix_swapfile" || true
-                ${pkgs.coreutils}/bin/rm -f "$npcnix_swapfile" || true
+                if [ ! -e "$npcnix_swapfile" ]; then
+                  ${pkgs.util-linux}/bin/swapoff "$npcnix_swapfile" || true
+                  ${pkgs.coreutils}/bin/rm -f "$npcnix_swapfile" || true
+                fi
               }
               # clean unconditionally, in case we left over something in a previous run, etc.
               trap cleanup EXIT
