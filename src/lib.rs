@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::ffi::OsString;
 use std::fs;
 use std::io::{self, Read, Write};
+use std::ops::ControlFlow;
 use std::path::Path;
 use std::process::{self, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -358,7 +359,11 @@ pub fn follow(
     }
 
     while !shutdown_requested.load(Ordering::SeqCst) {
-        follow_inner(data_dir, activate_opts, override_configuration, once)?;
+        if let ControlFlow::Break(()) =
+            follow_inner(data_dir, activate_opts, override_configuration, once)?
+        {
+            break;
+        }
 
         // reload the config, just in case it changed in the meantime
         let config = data_dir.load_config()?;
@@ -375,7 +380,7 @@ fn follow_inner(
     activate_opts: &ActivateOpts,
     override_configuration: Option<&str>,
     once: bool,
-) -> Result<(), anyhow::Error> {
+) -> Result<ControlFlow<(), ()>, anyhow::Error> {
     with_rebuilding_lock(Some(data_dir), || {
         // Note: we load every time, in case settings changed
         let config = data_dir.load_config()?;
@@ -396,13 +401,13 @@ fn follow_inner(
                     }
                     if once {
                         debug!("Exiting after successful activation with `once` option");
-                        return Ok(());
+                        return Ok(ControlFlow::Break(()));
                     }
                 }
                 Err(e) => error!(error = %e, "Failed to activate new configuration"),
             }
         }
-        Ok(())
+        Ok(ControlFlow::Continue(()))
     })
 }
 
