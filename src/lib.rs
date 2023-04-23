@@ -183,16 +183,20 @@ fn activate_inner(
 pub fn pack(src: &Path, include: &HashSet<OsString>, dst: &Path) -> anyhow::Result<()> {
     verify_flake_src(src)?;
 
-    let mut writer = io::BufWriter::new(
-        fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(dst)?,
-    );
+    let tmp_dst = dst.with_extension("tmp");
+    let file = fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&tmp_dst)?;
+    let mut writer = io::BufWriter::new(&file);
 
     pack_archive_from(src, include, &mut writer).context("Failed to pack the src archive")?;
     writer.flush()?;
     drop(writer);
+    file.sync_data()?;
+    drop(file);
+    std::fs::rename(tmp_dst, dst)?;
     Ok(())
 }
 
@@ -318,7 +322,6 @@ fn pack_archive_from(
             let path_target = path.read_link()?;
             if !path_target.is_absolute() {
                 trace!(src = %path.display(),
-                    
                     target = %path_target.display(),
                      "Packing relative symlink");
                 builder.append_path_with_name(&path, file_name)?;
