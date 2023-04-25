@@ -184,6 +184,10 @@ pub struct FollowOpts {
     /// Stop after first success
     #[arg(long)]
     once: bool,
+
+    /// Ignore etag and assume configuration changed
+    #[arg(long)]
+    ignore_etag: bool,
 }
 
 pub fn tracing_init() -> anyhow::Result<()> {
@@ -267,6 +271,7 @@ fn main() -> anyhow::Result<()> {
                 &follow_opts.clone().activate.into(),
                 None,
                 follow_opts.once,
+                follow_opts.ignore_etag,
             )?;
         }
         Command::Pause(PauseOpts { hours, minutes }) => {
@@ -313,6 +318,7 @@ fn main() -> anyhow::Result<()> {
                 &activate.clone().into(),
                 initial_configuration.as_deref(),
                 true,
+                false,
             )?;
         }
     }

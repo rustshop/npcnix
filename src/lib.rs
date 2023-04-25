@@ -348,6 +348,7 @@ pub fn follow(
     activate_opts: &ActivateOpts,
     override_configuration: Option<&str>,
     once: bool,
+    ignore_etag: bool,
 ) -> anyhow::Result<()> {
     let shutdown_requested = Arc::new(AtomicBool::new(false));
     let shutdown_on_signal = Arc::new(AtomicBool::new(false));
@@ -363,9 +364,13 @@ pub fn follow(
     }
 
     while !shutdown_requested.load(Ordering::SeqCst) {
-        if let ControlFlow::Break(()) =
-            follow_inner(data_dir, activate_opts, override_configuration, once)?
-        {
+        if let ControlFlow::Break(()) = follow_inner(
+            data_dir,
+            activate_opts,
+            override_configuration,
+            once,
+            ignore_etag,
+        )? {
             break;
         }
 
@@ -384,6 +389,7 @@ fn follow_inner(
     activate_opts: &ActivateOpts,
     override_configuration: Option<&str>,
     once: bool,
+    ignore_etag: bool,
 ) -> Result<ControlFlow<(), ()>, anyhow::Error> {
     with_activate_lock(Some(data_dir), || {
         // Note: we load every time, in case settings changed
@@ -392,7 +398,7 @@ fn follow_inner(
         if config.is_paused() {
             info!("Paused");
         } else {
-            match follow_inner_try(&config, activate_opts, override_configuration) {
+            match follow_inner_try(&config, activate_opts, override_configuration, ignore_etag) {
                 Ok(res) => {
                     match res {
                         Some((configuration, etag)) => {
@@ -419,6 +425,7 @@ pub fn follow_inner_try(
     config: &Config,
     activate_opts: &ActivateOpts,
     override_configuration: Option<&str>,
+    ignore_etag: bool,
 ) -> anyhow::Result<Option<(String, String)>> {
     let configuration = override_configuration
         .map(Ok)
@@ -426,7 +433,7 @@ pub fn follow_inner_try(
 
     let etag = self::get_etag(config.remote()?)?;
 
-    if config.last_configuration() == configuration && config.last_etag() == etag {
+    if !ignore_etag && config.last_configuration() == configuration && config.last_etag() == etag {
         return Ok(None);
     }
 
