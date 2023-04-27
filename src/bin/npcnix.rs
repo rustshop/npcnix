@@ -3,7 +3,7 @@ use std::io::Write as _;
 use std::path::PathBuf;
 use std::{ffi::OsString, io};
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use npcnix::data_dir::DataDir;
 use tracing::trace;
 use tracing_subscriber::layer::SubscriberExt;
@@ -176,6 +176,24 @@ pub enum SetOpts {
     Configuration { configuration: String },
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Default)]
+pub enum Once {
+    /// Finish on any success
+    #[default]
+    Any,
+    /// Finish on first activation of a new config
+    Activate,
+}
+
+impl From<Once> for npcnix::Once {
+    fn from(value: Once) -> Self {
+        match value {
+            Once::Any => npcnix::Once::Any,
+            Once::Activate => npcnix::Once::Activate,
+        }
+    }
+}
+
 #[derive(Parser, Debug, Clone)]
 pub struct FollowOpts {
     #[command(flatten)]
@@ -183,13 +201,22 @@ pub struct FollowOpts {
 
     /// Stop after first success
     #[arg(long)]
-    once: bool,
+    once: Option<Option<Once>>,
 
     /// Ignore etag and assume configuration changed
     #[arg(long)]
     ignore_etag: bool,
 }
 
+impl FollowOpts {
+    fn once(&self) -> Option<npcnix::Once> {
+        match self.once {
+            Some(Some(o)) => Some(o.into()),
+            Some(None) => Some(npcnix::Once::Any),
+            None => None,
+        }
+    }
+}
 pub fn tracing_init() -> anyhow::Result<()> {
     let filter_layer = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
     let fmt_layer = tracing_subscriber::fmt::layer()
@@ -270,7 +297,7 @@ fn main() -> anyhow::Result<()> {
                 &opts.data_dir(),
                 &follow_opts.clone().activate.into(),
                 None,
-                follow_opts.once,
+                follow_opts.once(),
                 follow_opts.ignore_etag,
             )?;
         }
@@ -317,7 +344,7 @@ fn main() -> anyhow::Result<()> {
                 &opts.data_dir(),
                 &activate.clone().into(),
                 initial_configuration.as_deref(),
-                true,
+                Some(npcnix::Once::Any),
                 false,
             )?;
         }

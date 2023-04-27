@@ -52,6 +52,12 @@ pub fn nixos_rebuild_path() -> OsString {
     std::env::var_os("NPCNIX_NIXOS_REBUILD").unwrap_or_else(|| OsString::from("nixos-rebuild"))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Once {
+    Any,
+    Activate,
+}
+
 pub fn pull(remote: &Url, dst: &Path) -> anyhow::Result<()> {
     let scheme = remote.scheme();
     let (reader, mut child) = match scheme {
@@ -347,7 +353,7 @@ pub fn follow(
     data_dir: &DataDir,
     activate_opts: &ActivateOpts,
     override_configuration: Option<&str>,
-    once: bool,
+    once: Option<Once>,
     ignore_etag: bool,
 ) -> anyhow::Result<()> {
     let shutdown_requested = Arc::new(AtomicBool::new(false));
@@ -388,7 +394,7 @@ fn follow_inner(
     data_dir: &DataDir,
     activate_opts: &ActivateOpts,
     override_configuration: Option<&str>,
-    once: bool,
+    once: Option<Once>,
     ignore_etag: bool,
 ) -> Result<ControlFlow<(), ()>, anyhow::Error> {
     with_activate_lock(Some(data_dir), || {
@@ -401,7 +407,7 @@ fn follow_inner(
             match follow_inner_try(&config, activate_opts, override_configuration, ignore_etag) {
                 Ok(res) => {
                     match res {
-                        Some((configuration, etag)) => {
+                        Some((ref configuration, ref etag)) => {
                             data_dir.update_last_reconfiguration(&configuration, &etag)?;
                             info!(etag, "Successfully activated new configuration");
                         }
@@ -409,9 +415,13 @@ fn follow_inner(
                             info!("Remote not changed");
                         }
                     }
-                    if once {
-                        debug!("Exiting after successful activation with `once` option");
-                        return Ok(ControlFlow::Break(()));
+                    match (once, res.is_some()) {
+                        (None, _) => {}
+                        (Some(Once::Activate), false) => {}
+                        (Some(Once::Any), _) | (Some(Once::Activate), true) => {
+                            debug!("Exiting after success due to `once` option");
+                            return Ok(ControlFlow::Break(()));
+                        }
                     }
                 }
                 Err(e) => error!(error = %e, "Failed to activate new configuration"),
