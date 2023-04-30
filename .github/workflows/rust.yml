@@ -29,8 +29,5 @@ jobs:
           authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
         continue-on-error: true
 
-      - name: Build npcnix
-        run: nix build .#npcnix
-
-      - name: Build npcnix-install
-        run: nix build .#install
+      - name: nix flake check
+        run: nix flake -L check
