@@ -31,8 +31,8 @@ with lib;
       after = [ "multi-user.target" ];
 
       stopIfChanged = false;
-      reloadIfChanged = true;
-      restartIfChanged = false;
+      reloadIfChanged = false; # no reload type
+      restartIfChanged = false; # we don't want to kill daemon currently running `nixos-rebuild`
 
       serviceConfig = {
         Restart = "always";
