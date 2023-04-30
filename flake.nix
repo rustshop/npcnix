@@ -79,6 +79,7 @@
         exec env \
           NPCNIX_AWS_CLI=''${NPCNIX_AWS_CLI:-${pkgs.awscli2}/bin/aws} \
           NPCNIX_NIXOS_REBUILD=''${NPCNIX_NIXOS_REBUILD:-${pkgs.nixos-rebuild}/bin/nixos-rebuild} \
+          PATH="${pkgs.git}/bin:$PATH" \
           ${npcnixPkgUnwrapped}/bin/npcnix "$@"
       '';
     in
@@ -121,6 +122,8 @@
 
       checks = {
         nixosConfiguration = self.nixosConfigurations.basic.config.system.build.toplevel;
+        npcnix = self.packages.${system}.npcnix;
+        install = self.packages.${system}.install;
       };
 
 
