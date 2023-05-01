@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+set -ex
+
+if [ -z "$1" ]; then
+  >&2 echo "Missing path"
+  exit 1
+fi
+
+path="$1"
+shift 1
+
+rm -f "$path" || true
+
+"$@"
+
+echo '{"md5sum": "'"$(md5sum "$path" | awk '{ print $1 }')"'","path":"'"$path"'"}'
