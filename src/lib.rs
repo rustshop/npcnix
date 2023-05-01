@@ -194,15 +194,23 @@ pub fn pack(src: &Path, include: &HashSet<OsString>, dst: &Path) -> anyhow::Resu
         .write(true)
         .create(true)
         .truncate(true)
-        .open(&tmp_dst)?;
+        .open(&tmp_dst)
+        .with_context(|| format!("Could not create temporary file: {}", tmp_dst.display()))?;
     let mut writer = io::BufWriter::new(&file);
 
-    pack_archive_from(src, include, &mut writer).context("Failed to pack the src archive")?;
+    pack_archive_from(src, include, &mut writer)
+        .with_context(|| format!("Failed to pack the src archive: {}", src.display()))?;
     writer.flush()?;
     drop(writer);
     file.sync_data()?;
     drop(file);
-    std::fs::rename(tmp_dst, dst)?;
+    std::fs::rename(&tmp_dst, dst).with_context(|| {
+        format!(
+            "Could not rename temporary file: {} to the final destination: {}",
+            tmp_dst.display(),
+            dst.display()
+        )
+    })?;
     Ok(())
 }
 
