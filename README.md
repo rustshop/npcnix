@@ -58,3 +58,76 @@ used.
 It shouldn't be difficult with a bit of cloud/system administraction
 skills to implement `npcnix` in any other environment.
 
+So first, we need a bucket to store the config:
+
+```terraform
+resource "aws_s3_bucket" "config" {
+  bucket = "some-config"
+}
+```
+
+And then let's carve out a part of it for *remotes* (compressed Nix flakes):
+
+```terraform
+module "npcnix_s3_store" {
+  source = "github.com/rustshop/npcnix//terraform/store_s3?ref=a1dd4621a56724fe36ca8940eb7172dd0f4be986"
+
+  bucket = aws_s3_bucket.config
+  prefix = "npcnix/remotes"
+}
+```
+
+We're going to need a boot script:
+
+```terraform
+module "npcnix_install" {
+  source = "github.com/rustshop/npcnix//terraform/install?ref=a1dd4621a56724fe36ca8940eb7172dd0f4be986"
+}
+```
+
+Finally a remote along with the command that will pack and upload to it:
+
+```terraform
+module "remote_dev" {
+  source   = "github.com/rustshop/npcnix//terraform/remote_s3?ref=a1dd4621a56724fe36ca8940eb7172dd0f4be986"
+
+  name  = "dev"
+  store = var.npcnix_s3_store
+}
+
+module "remote_dev_upload" {
+  source   = "github.com/rustshop/npcnix//terraform/remote_s3_upload?ref=a1dd4621a56724fe36ca8940eb7172dd0f4be986"
+
+  remote    = module.remote_dev
+  flake_dir = "../../configurations"
+  include   = []
+}
+```
+
+```terraform
+module "host" {
+  source = "github.com/rustshop/npcnix//terraform/instance?ref=a1dd4621a56724fe36ca8940eb7172dd0f4be986"
+
+  providers = {
+    aws = aws
+  }
+
+  remote        = module.remote_dev
+  install       = module.npcnix_install
+  root_access   = true
+  root_ssh_keys = local.fallback_ssh_keys
+
+  hostname      = "host"
+  subnet        = module.vpc-us-east-1.subnets["public-a"]
+  dns_zone      = aws_route53_zone.dev
+  ami           = local.ami.nixos_22_11.us-east-1
+  instance_type = "t3.nano"
+
+  pre_install_script = local.user_data_network_init
+
+  public_tcp_ports = [22]
+}
+```
+And that's basically it for Terraform configuration.
+
+On `terraform apply`, local `npcnix pack` will pack the Nix flake from `../../configurations`, and upload it to a remote. On start the system daemon will execute script prepared by `npcnix_install` that will configure `npcnix` on the machine, download the packed flake, and switch the configuration. As long as that configuration has a npcnix NixOS module enabled, a system daemon will keep monitoring the remote and switching to the desired configuration. 
