@@ -6,8 +6,8 @@
 
 If you are already using NixOS flakes to configure your NixOS
 systems, why bother using ssh to change their configurations,
-if you could just ... let them configure (and keep reconfiguring)
-themselves automatically, on their own.
+if you could just ... let them configure themselves automatically,
+on their own.
 
 The plan is as follows:
 
