@@ -1,7 +1,6 @@
 # NPCNIX
 
-> Provision your NixOS systems by broadcasting the official
-> narrative through the approved official communication channels.
+> Control your NixOS instances system configuration from a centrally managed location.
 
 ## Overview
 
