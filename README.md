@@ -148,6 +148,8 @@ And that's basically it for Terraform configuration required.
 
 On `terraform apply`, local `npcnix pack` will pack the Nix flake from `../../configurations`, and upload it to a remote. On start the system daemon will execute script prepared by `npcnix_install` that will configure `npcnix` on the machine, download the packed flake, and switch the configuration. As long as that configuration has a npcnix NixOS module enabled, a system daemon will keep monitoring the remote and switching to the desired configuration. 
 
+With just one command, you can start one or more machines that will automatically provision themselves with the desired configuration.
+
 ## FAQ
 
 ### What about destination machines having to build each configuration?
