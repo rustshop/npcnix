@@ -58,6 +58,9 @@ used.
 It shouldn't be difficult with a bit of cloud/system administraction
 skills to implement `npcnix` in any other environment.
 
+All the terraform modules used here are in the `./terraform` directory. You should
+probably pin them, or even just use as a reference.
+
 So first, we need a bucket to store the config:
 
 ```terraform
@@ -136,6 +139,13 @@ module "host" {
   public_tcp_ports = [22]
 }
 ```
-And that's basically it for Terraform configuration.
+
+And that's basically it for Terraform configuration required.
 
 On `terraform apply`, local `npcnix pack` will pack the Nix flake from `../../configurations`, and upload it to a remote. On start the system daemon will execute script prepared by `npcnix_install` that will configure `npcnix` on the machine, download the packed flake, and switch the configuration. As long as that configuration has a npcnix NixOS module enabled, a system daemon will keep monitoring the remote and switching to the desired configuration. 
+
+## FAQ
+
+### What about destination machines having to build each configuration?
+
+Use a build cache and/or remote builder machine. Both the install script module and the npcnix itself can use it. You can populate it from your local machine or CI of some kind.
