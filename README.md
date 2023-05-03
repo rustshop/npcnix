@@ -64,6 +64,14 @@ So first, we need a bucket to store the config:
 resource "aws_s3_bucket" "config" {
   bucket = "some-config"
 }
+
+resource "aws_s3_bucket_public_access_block" "config" {
+  bucket = aws_s3_bucket.config.id
+
+  block_public_acls   = true
+  block_public_policy = true
+  ignore_public_acls  = true
+}
 ```
 
 And then let's carve out a part of it for *remotes* (compressed Nix flakes):
