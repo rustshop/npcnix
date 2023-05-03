@@ -115,6 +115,11 @@ module "remote_dev_upload" {
 }
 ```
 
+And a EC2 instance that will bootstrap itself using the install script,
+have some alternative root ssh access (for debugging any issues) and
+then configure itself to use `"host"` NixOS configuration from flake
+in `../../configurations`.
+
 ```terraform
 module "host" {
   source = "github.com/rustshop/npcnix//terraform/instance?ref=a1dd4621a56724fe36ca8940eb7172dd0f4be986"
