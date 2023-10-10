@@ -2,7 +2,7 @@
   description = "Control your NixOS instances system configuration from a centrally managed location.";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs?rev=f294325aed382b66c7a188482101b0f336d1d7db"; # nixos-unstable
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05";
     flake-utils.url = "github:numtide/flake-utils";
     flakebox = {
       url = "github:rustshop/flakebox?rev=b07a9f3d17d400464210464e586f76223306f62d";
