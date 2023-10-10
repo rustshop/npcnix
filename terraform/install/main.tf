@@ -34,6 +34,7 @@ nix \
   --extra-trusted-public-keys "${s}" \
 %{endfor ~}
   --remote "$remote_url" \
+  --remote-region "$remote_region" \
   --configuration "$configuration"
 EOF
 }

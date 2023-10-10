@@ -2,6 +2,10 @@ variable "bucket" {
   description = "s3 bucket to use to store NixOs configs in"
 }
 
+variable "region" {
+  description = "s3 region to use to store NixOs configs in"
+}
+
 variable "prefix" {
   type        = string
   description = "prefix to give access to ec2 machines"
@@ -9,6 +13,10 @@ variable "prefix" {
 
 output "bucket" {
   value = var.bucket
+}
+
+output "region" {
+  value = var.region
 }
 
 output "prefix" {

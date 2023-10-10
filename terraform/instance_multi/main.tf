@@ -160,9 +160,11 @@ ${local.append_root_ssh_keys_cmd}
 %{if var.install != null}
 %{if var.configuration != null}
 remote_url='${var.remote.url}'
+remote_region='${var.remote.region}'
 configuration='${var.configuration}'
 %{else}
 remote_url='${var.remote.url}'
+remote_region='${var.remote.region}'
 configuration='${each.key}-${var.hostname_base}'
 %{endif}
 

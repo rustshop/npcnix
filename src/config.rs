@@ -54,6 +54,7 @@ impl ConfigPaused {
 #[serde(rename_all = "snake_case")]
 pub struct Config {
     remote: Option<Url>,
+    remote_region: Option<String>,
     configuration: Option<String>,
     last_reconfiguration: chrono::DateTime<chrono::Utc>,
     last_etag: String,
@@ -73,6 +74,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             remote: None,
+            remote_region: None,
             configuration: None,
             last_reconfiguration: chrono::Utc::now(),
             last_etag: "".into(),
@@ -125,6 +127,13 @@ impl Config {
     pub fn with_remote(self, remote: &Url) -> Self {
         Self {
             remote: Some(remote.clone()),
+            ..self
+        }
+    }
+
+    pub fn with_remote_region(self, remote_region: Option<&str>) -> Self {
+        Self {
+            remote_region: remote_region.map(ToString::to_string),
             ..self
         }
     }
@@ -184,6 +193,10 @@ impl Config {
         self.remote
             .as_ref()
             .ok_or_else(|| format_err!("Remote not set"))
+    }
+
+    pub fn region_opt(&self) -> Option<&str> {
+        self.remote_region.as_deref()
     }
 
     pub fn configuration(&self) -> anyhow::Result<&str> {

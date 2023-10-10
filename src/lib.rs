@@ -88,10 +88,10 @@ pub fn push(src: &Path, include: &HashSet<OsString>, remote: &url::Url) -> anyho
     Ok(())
 }
 
-pub fn get_etag(remote: &Url) -> anyhow::Result<String> {
+pub fn get_etag(remote: &Url, config: &Config) -> anyhow::Result<String> {
     let scheme = remote.scheme();
     Ok(match scheme {
-        "s3" => get_etag_s3(remote)?,
+        "s3" => get_etag_s3(remote, config.region_opt())?,
         _ => anyhow::bail!("Protocol not supported: {scheme}"),
     })
 }
@@ -111,7 +111,7 @@ pub fn with_activate_lock<T>(
         .transpose()?
         .flatten();
 
-    // Workaround: due to &mut aliasing limitations, it seems impossible to
+    // Workaround: due to `&mut` aliasing limitations, it seems impossible to
     // `try_write` first, then `write` if previous one failed, on the same
     // locked file. So we open same files twice instead.
     let mut lock2 = data_dir
@@ -230,24 +230,32 @@ struct EtagResponse {
     etag: String,
 }
 
-fn get_etag_s3(remote: &Url) -> anyhow::Result<String> {
+fn get_etag_s3(remote: &Url, region: Option<&str>) -> anyhow::Result<String> {
     let output = process::Command::new(aws_cli_path())
-        .args([
-            "s3api",
-            "get-object-attributes",
-            "--bucket",
-            remote
-                .host_str()
-                .ok_or_else(|| format_err!("Invalid URL"))?,
-            "--key",
-            remote
-                .path()
-                .split_once('/')
-                .ok_or_else(|| format_err!("Path doesn't start with a /"))?
-                .1,
-            "--object-attributes",
-            "ETag",
-        ])
+        .args(
+            [
+                "s3api",
+                "get-object-attributes",
+                "--bucket",
+                remote
+                    .host_str()
+                    .ok_or_else(|| format_err!("Invalid URL"))?,
+                "--key",
+                remote
+                    .path()
+                    .split_once('/')
+                    .ok_or_else(|| format_err!("Path doesn't start with a /"))?
+                    .1,
+                "--object-attributes",
+                "ETag",
+            ]
+            .into_iter()
+            .chain(if let Some(region) = region {
+                vec!["--region", region]
+            } else {
+                vec![]
+            }),
+        )
         .log_debug()
         .output()
         .context("`aws` cli failed")?;
@@ -416,7 +424,7 @@ fn follow_inner(
                 Ok(res) => {
                     match res {
                         Some((ref configuration, ref etag)) => {
-                            data_dir.update_last_reconfiguration(&configuration, &etag)?;
+                            data_dir.update_last_reconfiguration(configuration, etag)?;
                             info!(etag, "Successfully activated new configuration");
                         }
                         None => {
@@ -449,7 +457,7 @@ pub fn follow_inner_try(
         .map(Ok)
         .unwrap_or_else(|| config.configuration())?;
 
-    let etag = self::get_etag(config.remote()?)?;
+    let etag = self::get_etag(config.remote()?, config)?;
 
     if !ignore_etag && config.last_configuration() == configuration && config.last_etag() == etag {
         return Ok(None);

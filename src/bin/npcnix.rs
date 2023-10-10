@@ -118,6 +118,10 @@ pub struct InstallOpts {
     remote: Url,
 
     #[arg(long)]
+    /// Region to use for the remote access (typically s3 bucket)
+    remote_region: Option<String>,
+
+    #[arg(long)]
     /// Configuration to use for the host
     configuration: String,
 
@@ -328,6 +332,7 @@ fn main() -> anyhow::Result<()> {
         }
         Command::Install(InstallOpts {
             ref remote,
+            ref remote_region,
             ref configuration,
             ref initial_configuration,
             ref activate,
@@ -337,6 +342,7 @@ fn main() -> anyhow::Result<()> {
                     .data_dir()
                     .load_config()?
                     .with_remote(remote)
+                    .with_remote_region(remote_region.as_deref())
                     .with_configuration(configuration),
             )?;
 
