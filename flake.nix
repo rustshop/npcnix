@@ -2,7 +2,7 @@
   description = "Control your NixOS instances system configuration from a centrally managed location.";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     flakebox = {
       url = "github:rustshop/flakebox?rev=b07a9f3d17d400464210464e586f76223306f62d";
@@ -33,7 +33,7 @@
               ec2.hvm = true;
 
 
-              system.stateVersion = "22.11";
+              system.stateVersion = "23.05";
             })
 
             self.nixosModules.default
@@ -46,7 +46,6 @@
       pkgs = import nixpkgs {
         inherit system;
       };
-      lib = pkgs.lib;
 
       projectName = "npcnix";
 
@@ -82,8 +81,6 @@
               ];
               nativeBuildInputs = [
                 pkgs.pkg-config
-
-
               ];
             });
           in
