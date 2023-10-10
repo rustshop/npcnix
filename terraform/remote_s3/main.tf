@@ -29,3 +29,7 @@ output "key" {
 output "url" {
   value = "s3://${var.store.bucket.id}/${var.store.prefix}/${local.filename}"
 }
+
+output "region" {
+  value = var.store.region
+}
