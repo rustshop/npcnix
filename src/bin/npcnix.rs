@@ -1,15 +1,15 @@
 #![doc = include_str!("../../README.md")]
+use std::ffi::OsString;
+use std::io;
 use std::io::Write as _;
 use std::path::PathBuf;
-use std::{ffi::OsString, io};
 
 use clap::{Parser, Subcommand, ValueEnum};
 use npcnix::data_dir::DataDir;
 use tracing::trace;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::EnvFilter;
-use tracing_subscriber::Layer;
+use tracing_subscriber::{EnvFilter, Layer};
 use url::Url;
 
 #[derive(Parser, Debug, Clone)]
@@ -36,11 +36,13 @@ pub enum Command {
     },
     /// Activate a NixOS configuration from a Nix Flake in a local directory
     Activate(ActivateOpts),
-    /// Pack a Nix Flake in a local directory into a remote-like packed Nix Flake file
+    /// Pack a Nix Flake in a local directory into a remote-like packed Nix
+    /// Flake file
     Pack(PackOpts),
     /// Pull a packed Nix Flake from a remote and extra to a directory
     Pull(PullOpts),
-    /// Pack a Nix Flake in a local directory into a packed Nix Flake file and upload to a remote
+    /// Pack a Nix Flake in a local directory into a packed Nix Flake file and
+    /// upload to a remote
     Push(PushOpts),
     /// Install npcnix on the machine
     Install(InstallOpts),

@@ -14,8 +14,7 @@ The plan is as follows:
 First, prepare a location that can store and serve files
 (an npcnix *store*) - e.g. an S3 bucket (or a prefix inside it).
 
-Within it, publish compressed flakes under a certain
-addresses (an npcnix *remote*s) - e.g. a keys in a S3 bucket.
+Within it, publish compressed flakes under certain addresses (an npcnix *remote*s) - e.g. a keys in a S3 bucket.
 
 Configure your NixOS hosts/images to run an initialization script
 at the first boot that will download a flake from a given *remote*
@@ -32,8 +31,8 @@ location. Yet simpler, easy to set up, understand and customize,
 and can go a long way to help manage a small to medium size herd
 of NixOS-based machines.
 
-It integrates well with existing infrastucture, CI systems and
-tooling, especially in cloud environements.
+It integrates well with existing infrastructure, CI systems and
+tooling, especially in cloud environments.
 
 In combination with internal remote builders and Nix caching
 servers (or corresponding services like cachix) it can work very
@@ -41,7 +40,7 @@ effectively.
 
 Since the npcnix-managed systems "pull" their configuration,
 security posture of the whole system can be improved (in comparison
-to a ssh-based approach), as active remote access is not even necessary,
+to an ssh-based approach), as active remote access is not even necessary,
 and permission system can be centralized around the *store* write privileges.
 
 
@@ -51,10 +50,10 @@ My use case involves AWS as a cloud, S3 as a cheap, yet abundant *store*,
 with a built-in and integrated (in AWS) permission system, and Terraform
 integration for convenience.
 
-The guide will assume you're familiar with with the products and tools
+The guide will assume you're familiar with the products and tools
 used.
 
-It shouldn't be difficult with a bit of cloud/system administraction
+It shouldn't be difficult with a bit of cloud/system administration
 skills to implement `npcnix` in any other environment.
 
 All the terraform modules used here are in the `./terraform` directory. You should
@@ -95,7 +94,7 @@ module "npcnix_install" {
 }
 ```
 
-Finally a remote along with the command that will pack and upload to it:
+Finally, a remote along with the command that will pack and upload to it:
 
 ```terraform
 module "remote_dev" {
@@ -114,7 +113,7 @@ module "remote_dev_upload" {
 }
 ```
 
-And a EC2 instance that will bootstrap itself using the install script,
+And a EC2 instance that will bootstrap itself using the installation script,
 have some alternative root ssh access (for debugging any issues) and
 then configure itself to use `"host"` NixOS configuration from flake
 in `../../configurations`.
@@ -154,4 +153,4 @@ With just one command, you can start one or more machines that will automaticall
 
 ### What about destination machines having to build each configuration?
 
-Use a build cache and/or remote builder machine. Both the install script module and the npcnix itself can use it. You can populate it from your local machine or CI of some kind.
+Use a build cache and/or remote builder machine. Both the installation script module and the npcnix itself can use it. You can populate it from your local machine or CI of some kind.

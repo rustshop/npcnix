@@ -1,14 +1,15 @@
 {
-  description = "dpc's basic flake template";
+  description = "Control your NixOS instances system configuration from a centrally managed location.";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs?rev=f294325aed382b66c7a188482101b0f336d1d7db"; # nixos-unstable
     flake-utils.url = "github:numtide/flake-utils";
-    crane.url = "github:ipetkov/crane?rev=445a3d222947632b5593112bb817850e8a9cf737"; # v0.12.1
-    crane.inputs.nixpkgs.follows = "nixpkgs";
+    flakebox = {
+      url = "github:rustshop/flakebox?rev=b07a9f3d17d400464210464e586f76223306f62d";
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils, crane }: {
+  outputs = { self, nixpkgs, flake-utils, flakebox }: {
     nixosModules = {
       npcnix = import ./modules/npcnix.nix { inherit self; };
       default = self.nixosModules.npcnix;
@@ -46,47 +47,62 @@
         inherit system;
       };
       lib = pkgs.lib;
-      craneLib = crane.lib.${system};
 
-      commonArgs =
+      projectName = "npcnix";
 
-        let
-          # Only keeps markdown files
-          readmeFilter = path: _type: builtins.match ".*/README\.md$" path != null;
-          markdownOrCargo = path: type:
-            (readmeFilter path type) || (craneLib.filterCargoSources path type);
-        in
-        {
-          doCheck = false;
+      flakeboxLib = flakebox.lib.${system} {
+        config = { };
+      };
 
-          src = lib.cleanSourceWith {
-            src = craneLib.path ./.;
-            filter = markdownOrCargo;
-          };
+      buildPaths = [
+        "Cargo.toml"
+        "Cargo.lock"
+        ".cargo"
+        "src"
+        "README.md"
+      ];
 
-          buildInputs = [
-            pkgs.openssl
-            pkgs.pkg-config
-          ] ++ lib.optionals pkgs.stdenv.isDarwin [
-            pkgs.libiconv
-            pkgs.darwin.apple_sdk.frameworks.Security
-          ];
-
-          nativeBuildInputs = [ ];
+      buildSrc = flakeboxLib.filterSubPaths {
+        root = builtins.path {
+          name = projectName;
+          path = ./.;
         };
-      npcnixPkgUnwrapped = craneLib.buildPackage ({ } // commonArgs);
+        paths = buildPaths;
+      };
+
+      multiBuild =
+        (flakeboxLib.craneMultiBuild { }) (craneLib':
+          let
+            craneLib = (craneLib'.overrideArgs {
+              pname = projectName;
+              src = buildSrc;
+              buildInputs = [
+                pkgs.openssl
+
+              ];
+              nativeBuildInputs = [
+                pkgs.pkg-config
+
+
+              ];
+            });
+          in
+          {
+            npcnix = craneLib.buildPackage { };
+          });
+
       npcnixPkgWrapped = pkgs.writeShellScriptBin "npcnix" ''
         exec env \
           NPCNIX_AWS_CLI=''${NPCNIX_AWS_CLI:-${pkgs.awscli2}/bin/aws} \
           NPCNIX_NIXOS_REBUILD=''${NPCNIX_NIXOS_REBUILD:-${pkgs.nixos-rebuild}/bin/nixos-rebuild} \
           PATH="${pkgs.git}/bin:$PATH" \
-          ${npcnixPkgUnwrapped}/bin/npcnix "$@"
+          ${multiBuild.npcnix}/bin/npcnix "$@"
       '';
     in
     {
       packages = {
         default = npcnixPkgWrapped;
-        npcnix-unwrapped = npcnixPkgUnwrapped;
+        npcnix-unwrapped = multiBuild.npcnix;
         npcnix = npcnixPkgWrapped;
         install = pkgs.writeShellScriptBin "npcnix-install" ''
           set -e
@@ -126,29 +142,8 @@
         install = self.packages.${system}.install;
       };
 
-
       devShells = {
-        default = pkgs.mkShell {
-
-          buildInputs = [ ] ++ commonArgs.buildInputs;
-          nativeBuildInputs = builtins.attrValues
-            {
-              inherit (pkgs) rust-analyzer cargo-udeps typos cargo rustc rustfmt clippy just nixpkgs-fmt shellcheck rnix-lsp;
-            } ++ [
-            pkgs.nodePackages.bash-language-server
-            # This is required to prevent a mangled bash shell in nix develop
-            # see: https://discourse.nixos.org/t/interactive-bash-with-nix-develop-flake/15486
-            (pkgs.hiPrio pkgs.bashInteractive)
-          ] ++ commonArgs.nativeBuildInputs;
-          shellHook = ''
-            dot_git="$(git rev-parse --git-common-dir)"
-            if [[ ! -d "$dot_git/hooks" ]]; then
-                mkdir "$dot_git/hooks"
-            fi
-            for hook in misc/git-hooks/* ; do ln -sf "$(pwd)/$hook" "$dot_git/hooks/" ; done
-            ${pkgs.git}/bin/git config commit.template $(pwd)/misc/git-hooks/commit-template.txt
-          '';
-        };
+        default = flakeboxLib.mkDevShell { };
       };
     }
   );
