@@ -46,6 +46,7 @@
       pkgs = import nixpkgs {
         inherit system;
       };
+      lib = pkgs.lib;
 
       projectName = "npcnix";
 
@@ -134,9 +135,11 @@
       };
 
       checks = {
-        nixosConfiguration = self.nixosConfigurations.basic.config.system.build.toplevel;
         npcnix = self.packages.${system}.npcnix;
         install = self.packages.${system}.install;
+      } // libs.optionalAttrs (pkgs.stdenv.system == "x86_64-linux") {
+        nixosConfiguration = self.nixosConfigurations.basic.config.system.build.toplevel;
+
       };
 
       devShells = {
