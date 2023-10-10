@@ -13,7 +13,6 @@ use std::sync::Arc;
 use anyhow::{bail, format_err, Context};
 use config::Config;
 use data_dir::DataDir;
-
 use serde::Deserialize;
 use signal_hook::consts::TERM_SIGNALS;
 use signal_hook::flag;
