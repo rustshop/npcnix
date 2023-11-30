@@ -34,6 +34,8 @@ pub enum Command {
         #[command(subcommand)]
         command: Option<ConfigOpts>,
     },
+    /// Status
+    Status,
     /// Activate a NixOS configuration from a Nix Flake in a local directory
     Activate(ActivateOpts),
     /// Pack a Nix Flake in a local directory into a remote-like packed Nix
@@ -274,6 +276,10 @@ fn main() -> anyhow::Result<()> {
                 )?,
             },
         },
+        Command::Status => {
+            let status_string = opts.data_dir().load_config()?.status_string();
+            let _ = write!(std::io::stdout(), "{}\n", status_string);
+        }
         Command::Activate(ref activate_opts) => {
             if opts.data_dir().config_exist()? {
                 let configuration = opts
