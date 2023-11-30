@@ -259,7 +259,7 @@ fn main() -> anyhow::Result<()> {
         )?,
         Command::Config { ref command } => match command {
             Some(ConfigOpts::Show) | None => {
-                let _ = write!(std::io::stdout(), "{}", opts.data_dir().load_config()?);
+                let _ = write!(std::io::stdout(), "{}\n", opts.data_dir().load_config()?);
             }
             Some(ConfigOpts::Set { init, ref value }) => match value {
                 SetOpts::Remote { ref url } => opts.data_dir().store_config(
