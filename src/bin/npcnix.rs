@@ -319,13 +319,13 @@ fn main() -> anyhow::Result<()> {
             let config = if let Some(minutes) = minutes {
                 config.with_paused_until(
                     chrono::Utc::now()
-                        + chrono::Duration::seconds(TryFrom::try_from(minutes.saturating_add(60))?),
+                        + chrono::Duration::seconds(TryFrom::try_from(minutes.saturating_mul(60))?),
                 )
             } else if let Some(hours) = hours {
                 config.with_paused_until(
                     chrono::Utc::now()
                         + chrono::Duration::seconds(TryFrom::try_from(
-                            hours.saturating_add(60 * 60),
+                            hours.saturating_mul(60 * 60),
                         )?),
                 )
             } else {
