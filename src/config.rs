@@ -170,6 +170,23 @@ impl Config {
             .unwrap_or(false)
     }
 
+    pub fn status_string(&self) -> String {
+        match self.paused {
+            Some(paused) if !paused.is_expired() => match paused {
+                ConfigPaused::Indefinitely => "paused (indefinitely)".to_string(),
+                ConfigPaused::Until { until } => {
+                    let duration = until.signed_duration_since(Utc::now());
+                    format!(
+                        "paused (until {}; <={}h)",
+                        until.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+                        duration.num_hours() + 1
+                    )
+                }
+            },
+            _ => "active".to_string(),
+        }
+    }
+
     /// Like [`Self:with_remote`] but if `init` is `true` will not overwrite the
     /// existing value
     pub fn with_remote_maybe_init(self, remote: &Url, init: bool) -> Self {

@@ -34,6 +34,8 @@ pub enum Command {
         #[command(subcommand)]
         command: Option<ConfigOpts>,
     },
+    /// Status
+    Status,
     /// Activate a NixOS configuration from a Nix Flake in a local directory
     Activate(ActivateOpts),
     /// Pack a Nix Flake in a local directory into a remote-like packed Nix
@@ -257,7 +259,7 @@ fn main() -> anyhow::Result<()> {
         )?,
         Command::Config { ref command } => match command {
             Some(ConfigOpts::Show) | None => {
-                let _ = write!(std::io::stdout(), "{}", opts.data_dir().load_config()?);
+                let _ = write!(std::io::stdout(), "{}\n", opts.data_dir().load_config()?);
             }
             Some(ConfigOpts::Set { init, ref value }) => match value {
                 SetOpts::Remote { ref url } => opts.data_dir().store_config(
@@ -274,6 +276,10 @@ fn main() -> anyhow::Result<()> {
                 )?,
             },
         },
+        Command::Status => {
+            let status_string = opts.data_dir().load_config()?.status_string();
+            let _ = write!(std::io::stdout(), "{}\n", status_string);
+        }
         Command::Activate(ref activate_opts) => {
             if opts.data_dir().config_exist()? {
                 let configuration = opts
@@ -313,13 +319,13 @@ fn main() -> anyhow::Result<()> {
             let config = if let Some(minutes) = minutes {
                 config.with_paused_until(
                     chrono::Utc::now()
-                        + chrono::Duration::seconds(TryFrom::try_from(minutes.saturating_add(60))?),
+                        + chrono::Duration::seconds(TryFrom::try_from(minutes.saturating_mul(60))?),
                 )
             } else if let Some(hours) = hours {
                 config.with_paused_until(
                     chrono::Utc::now()
                         + chrono::Duration::seconds(TryFrom::try_from(
-                            hours.saturating_add(60 * 60),
+                            hours.saturating_mul(60 * 60),
                         )?),
                 )
             } else {
