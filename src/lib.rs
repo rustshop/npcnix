@@ -427,7 +427,7 @@ fn follow_inner(
                             info!(etag, "Successfully activated new configuration");
                         }
                         None => {
-                            info!("Remote not changed");
+                            debug!("Remote not changed");
                         }
                     }
                     match (once, res.is_some()) {
